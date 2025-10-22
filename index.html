@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PixiJS Webcam Effects</title>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at center, #1e293b, #0b1324 65%);
+      font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #e2e8f0;
+    }
+
+    #app {
+      width: min(90vmin, 900px);
+      height: min(90vmin, 900px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    canvas {
+      border-radius: 20px;
+      box-shadow: 0 25px 60px rgba(15, 23, 42, 0.6);
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    video {
+      display: none;
+    }
+
+    .error {
+      text-align: center;
+      padding: 1.5rem 2rem;
+      border-radius: 18px;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      max-width: 420px;
+      line-height: 1.5;
+    }
+
+    .error strong {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-size: 1.125rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <video id="webcam" autoplay playsinline muted></video>
+
+  <script type="module">
+    import {
+      Application,
+      Sprite,
+      Texture,
+      ColorMatrixFilter,
+      NoiseFilter
+    } from "https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.mjs";
+
+    const container = document.getElementById("app");
+    const webcam = document.getElementById("webcam");
+
+    const showError = (message) => {
+      container.innerHTML = `
+        <div class="error">
+          <strong>Camera Access Needed</strong>
+          <span>${message}</span>
+        </div>
+      `;
+    };
+
+    const start = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" },
+          audio: false
+        });
+
+        webcam.srcObject = stream;
+        await webcam.play();
+
+        const app = new Application();
+        await app.init({
+          resizeTo: container,
+          backgroundAlpha: 0,
+          antialias: true
+        });
+
+        container.replaceChildren(app.canvas);
+
+        const texture = Texture.from(webcam);
+        const sprite = new Sprite(texture);
+        sprite.anchor.set(0.5);
+
+        const colorMatrix = new ColorMatrixFilter();
+        colorMatrix.matrix = [
+          1, 0, 0, 0, 0,
+          0, 0, 0, 0, 0,
+          0, 0, 1, 0, 0,
+          0, 0, 0, 1, 0
+        ];
+
+        const noiseFilter = new NoiseFilter({ noise: 0.22 });
+        sprite.filters = [colorMatrix, noiseFilter];
+
+        app.stage.addChild(sprite);
+
+        const resizeSprite = () => {
+          const { width, height } = app.renderer;
+          sprite.position.set(width / 2, height / 2);
+
+          const videoWidth = webcam.videoWidth || 1;
+          const videoHeight = webcam.videoHeight || 1;
+          const videoAspect = videoWidth / videoHeight;
+          const viewAspect = width / height;
+
+          const scaleFactor = 0.9; // keep some padding inside the canvas
+
+          if (viewAspect > videoAspect) {
+            sprite.height = height * scaleFactor;
+            sprite.width = sprite.height * videoAspect;
+          } else {
+            sprite.width = width * scaleFactor;
+            sprite.height = sprite.width / videoAspect;
+          }
+        };
+
+        if (webcam.readyState >= 1) {
+          resizeSprite();
+        } else {
+          webcam.addEventListener("loadedmetadata", resizeSprite, { once: true });
+        }
+
+        window.addEventListener("resize", resizeSprite);
+
+        app.ticker.add(() => {
+          if (webcam.readyState >= 2) {
+            texture.baseTexture.resource?.update?.();
+          }
+          noiseFilter.seed = Math.random();
+        });
+      } catch (error) {
+        console.error("Unable to start webcam:", error);
+        const hint = error.name === "NotAllowedError"
+          ? "Please allow camera access and refresh the page."
+          : "We couldn't access your camera. Check that another app isn't using it.";
+        showError(hint);
+      }
+    };
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      showError("Your browser doesn't support camera access via getUserMedia.");
+    } else {
+      start();
+    }
+  </script>
+</body>
+</html>
