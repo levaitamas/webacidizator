@@ -70,7 +70,8 @@
       Sprite,
       Texture,
       ColorMatrixFilter,
-      NoiseFilter
+      NoiseFilter,
+      Filter
     } from "https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.mjs";
 
     const container = document.getElementById("app");
@@ -117,7 +118,55 @@
         ];
 
         const noiseFilter = new NoiseFilter({ noise: 0.22 });
-        sprite.filters = [colorMatrix, noiseFilter];
+
+	// Pixel Sort Shader (GLSL)
+	const pixelSortFrag = `
+	precision mediump float;
+	varying vec2 vUv;
+	uniform sampler2D uSampler;
+	uniform vec4 inputSize;
+	uniform float minThreshold;
+	uniform float maxThreshold;
+
+	float luminance(vec3 color) {
+	  return dot(color, vec3(0.299, 0.587, 0.114));
+	}
+
+	void main() {
+	  vec2 uv = vUv;
+	  vec4 current = texture2D(uSampler, uv);
+	  float luma = luminance(current.rgb);
+	  float texelY = inputSize.w;
+
+	  // Look one pixel above
+	  vec4 above = texture2D(uSampler, vec2(uv.x, uv.y - texelY));
+	  float aboveLuma = luminance(above.rgb);
+
+	  bool within = (luma >= minThreshold && luma <= maxThreshold) &&
+	                (aboveLuma >= minThreshold && aboveLuma <= maxThreshold);
+
+	  // Sort by luminance (descending)
+	  if (within && luma < aboveLuma) {
+	    gl_FragColor = above;
+	  } else {
+	    gl_FragColor = current;
+	  }
+	}
+	`;
+
+	// Create Pixel Sort Filter
+	const pixelSortFilter = Filter.from({
+	  fragment: pixelSortFrag,
+	  resources: {
+	    uniforms: {
+	      minThreshold: { value: 0.15, type: "f32" }, // normalized 0-1 range
+	      maxThreshold: { value: 0.68, type: "f32" },
+	      inputSize: { value: new Float32Array([0, 0, 0, 1.0 / webcam.videoHeight || 480]) },
+	    },
+	  },
+	});
+
+	sprite.filters = [colorMatrix, noiseFilter, pixelSortFilter];
 
         app.stage.addChild(sprite);
 
@@ -154,6 +203,11 @@
             texture.baseTexture.resource?.update?.();
           }
           noiseFilter.seed = Math.random();
+
+	  pixelSortFilter.resources.uniforms.inputSize.value =
+              new Float32Array(
+	          [app.renderer.width, app.renderer.height, 0, 1.0 / (webcam.videoHeight || 480)]
+	      );
         });
       } catch (error) {
         console.error("Unable to start webcam:", error);
