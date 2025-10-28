@@ -6,7 +6,8 @@ COPY go.mod ./
 COPY go.sum ./
 RUN go mod download
 
-#COPY *.go ./
+COPY *.go ./
+COPY static/ /static/
 #COPY internal/ internal/
 
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -trimpath -o webacidizator .
