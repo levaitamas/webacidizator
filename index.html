@@ -104,6 +104,9 @@
           antialias: true
         });
 
+        // Set FPS limit
+        app.ticker.maxFPS = 15;
+
         container.replaceChildren(app.canvas);
 
         const texture = Texture.from(webcam);
