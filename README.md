@@ -1,41 +1,37 @@
-# PixiJS Webcam Effects
+# WebAcidizator
 
-A single-page demo that uses [PixiJS v8](https://pixijs.com/) to render your webcam feed with a custom filter stack. The first pass removes the green color channel via a `ColorMatrixFilter`, and the second pass injects animated RGB noise using `NoiseFilter`. The processed stream is displayed at the center of the viewport with a responsive layout.
+A real-time webcam glitch art effect application with pixel sorting, color manipulation, and noise generation. Built with PixiJS v8 and served via a lightweight Go web service with Prometheus metrics.
 
-## Features
+![Go Version](https://img.shields.io/badge/go-1.25-blue)
+![PixiJS Version](https://img.shields.io/badge/pixijs-8.x-purple)
 
-- Green channel suppression using PixiJS `ColorMatrixFilter`
-- Animated RGB grain with PixiJS `NoiseFilter`
-- Responsive canvas that scales to common display sizes
-- Graceful fallback messaging when camera access is unavailable
+## ✨ Features
 
-## Requirements
+- **Real-time Webcam Effects**: Live webcam feed with GPU-accelerated glitch effects
+- **Pixel Sorting**: Custom GLSL shader implementing vertical pixel sorting based on luminance
+- **Dynamic Parameters**: Automatically randomized effect parameters for evolving visual aesthetics
+- **Photo Capture**: Save snapshots of filtered webcam with timestamp
+- **Color Matrix Filtering**: Removes green channel for cyan/magenta color scheme
+- **Animated Noise**: Continuously animated grain/noise overlay
+- **Prometheus Metrics**: Built-in HTTP metrics and custom application metrics
+- **Kubernetes Ready**: Complete K8s manifests for production deployment
+- **Lightweight**: Minimal Go backend (~10MB container) with embedded static files
 
-- A modern desktop or mobile browser that supports ES modules and `navigator.mediaDevices.getUserMedia`
-- Access to a webcam (integrated or external)
-- Serving the files over HTTPS or `http://localhost` (browsers block webcam access on insecure origins)
+## 🎬 How It Works
 
-## Getting Started
+1. **Webcam Capture**: Requests browser webcam access (user-facing camera)
+2. **PixiJS Rendering**: Video frames rendered to WebGL canvas at 15 FPS
+3. **Filter Pipeline**:
+   - Color matrix (removes green channel)
+   - Animated noise filter
+   - Custom pixel sort shader (vertical luminance-based sorting)
+4. **Dynamic Effects**: Parameters randomized every 60 frames for glitch aesthetic
+5. **Photo Export**: Capture current frame as PNG with timestamped filename
 
-1. Install a lightweight static server if you do not already have one. For example:
-   ```bash
-   npm install --global serve
-   ```
-2. From the project directory, start the server:
-   ```bash
-   serve .
-   ```
-3. Open the printed local URL (e.g., `http://localhost:3000`) in your browser.
-4. Grant camera permission when prompted. The filtered feed should appear centered on the page.
+## 🙏 Acknowledgments
 
-## Customization Tips
-
-- **Noise intensity**: Adjust the `noise` option when constructing the `NoiseFilter`.
-- **Color mix**: Modify the 4×5 matrix assigned to the `ColorMatrixFilter` to experiment with other channel blends.
-- **Canvas framing**: Tweak the `scaleFactor` inside `resizeSprite` to change how much padding surrounds the video.
-
-## Troubleshooting
-
-- **Permission denied**: Refresh the page and allow camera access. Some browsers require site settings to be reset manually.
-- **Blank canvas**: Ensure you are serving over HTTPS or `localhost`. `file://` origins are blocked from webcam access in most browsers.
-- **Distorted aspect ratio**: The canvas resizes dynamically, but if you alter layout styles, verify `sprite.width`/`height` calculations still respect the video aspect ratio.
+- **PixiJS**: Powerful 2D WebGL rendering engine
+- **Prometheus**: Industry-standard metrics and monitoring
+- **Perplexity AI**: AI-powered research and development assistance
+- **Claude Sonnet 4.5**: Advanced AI model for code generation and debugging
+- Inspired by glitch art and pixel sorting techniques
