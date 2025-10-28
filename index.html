@@ -253,7 +253,7 @@
           const videoAspect = videoWidth / videoHeight;
           const viewAspect = width / height;
 
-          const scaleFactor = 0.9; // keep some padding inside the canvas
+          const scaleFactor = 0.95; // keep some padding inside the canvas
 
           if (viewAspect > videoAspect) {
             sprite.height = height * scaleFactor;
@@ -272,11 +272,26 @@
 
         window.addEventListener("resize", resizeSprite);
 
+        let frameCount = 0;
+        const changeInterval = 60;
+
         app.ticker.add(() => {
           if (webcam.readyState >= 2) {
             texture.baseTexture.resource?.update?.();
           }
-          noiseFilter.seed = Math.random();
+
+          frameCount++;
+
+          if (frameCount % changeInterval === 0) {
+
+            noiseFilter.seed = Math.random();
+
+            if (pixelSortFilter.uniforms) {
+              pixelSortFilter.uniforms.uMinThreshold = 0.1 + Math.random() * 0.2;
+              pixelSortFilter.uniforms.uMaxThreshold = 0.5 + Math.random() * 0.5;
+              pixelSortFilter.uniforms.uSpread = 15 + Math.random() * 50;
+            }
+          }
         });
       } catch (error) {
         console.error("Unable to start webcam:", error);
