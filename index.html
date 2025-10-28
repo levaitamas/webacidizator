@@ -24,6 +24,14 @@
       color: #e2e8f0;
     }
 
+    #container {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
     #app {
       width: min(90vmin, 900px);
       height: min(90vmin, 900px);
@@ -43,6 +51,64 @@
       display: none;
     }
 
+    .controls {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    #captureBtn {
+      padding: 0.875rem 2rem;
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    #captureBtn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+    }
+
+    #captureBtn:active {
+      transform: translateY(0);
+    }
+
+    #captureBtn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    #captureBtn::before {
+      content: "📸";
+      font-size: 1.2rem;
+    }
+
+    .flash {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: white;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.1s ease;
+    }
+
+    .flash.active {
+      opacity: 0.8;
+    }
+
     .error {
       text-align: center;
       padding: 1.5rem 2rem;
@@ -58,11 +124,24 @@
       margin-bottom: 0.5rem;
       font-size: 1.125rem;
     }
+
+    .status {
+      font-size: 0.875rem;
+      color: #94a3b8;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
-  <div id="app"></div>
+  <div id="container">
+    <div id="app"></div>
+    <div class="controls">
+      <button id="captureBtn" disabled>Capture Photo</button>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
   <video id="webcam" autoplay playsinline muted></video>
+  <div class="flash" id="flash"></div>
 
   <script type="module">
     import {
@@ -78,9 +157,9 @@
     // Configuration constants
     const CONFIG = {
       FPS: 15,
-      SCALE_FACTOR: 0.95,
+      SCALE_FACTOR: 1,
       NOISE_AMOUNT: 0.22,
-      PARAM_CHANGE_INTERVAL: 60, // frames
+      PARAM_CHANGE_INTERVAL: 60,
       PIXEL_SORT: {
         MIN_THRESHOLD_RANGE: [0.1, 0.3],
         MAX_THRESHOLD_RANGE: [0.5, 1.0],
@@ -185,6 +264,9 @@ void main(void) {
 
     const container = document.getElementById("app");
     const webcam = document.getElementById("webcam");
+    const captureBtn = document.getElementById("captureBtn");
+    const flash = document.getElementById("flash");
+    const status = document.getElementById("status");
 
     /**
      * Display error message in the UI
@@ -209,10 +291,10 @@ void main(void) {
     const createColorMatrix = () => {
       const filter = new ColorMatrixFilter();
       filter.matrix = [
-        1, 0, 0, 0, 0,  // Red: keep red
-        0, 0, 0, 0, 0,  // Green: remove all green
-        0, 0, 1, 0, 0,  // Blue: keep blue
-        0, 0, 0, 1, 0   // Alpha: keep alpha
+        1, 0, 0, 0, 0,
+        0, 0, 0, 0, 0,
+        0, 0, 1, 0, 0,
+        0, 0, 0, 1, 0
       ];
       return filter;
     };
@@ -250,6 +332,53 @@ void main(void) {
     };
 
     /**
+     * Flash animation effect
+     */
+    const playFlashEffect = () => {
+      flash.classList.add('active');
+      setTimeout(() => flash.classList.remove('active'), 100);
+    };
+
+    /**
+     * Capture current canvas and download as image
+     */
+    const capturePhoto = (app) => {
+      try {
+        playFlashEffect();
+
+        // Get canvas from PixiJS app (v8 uses app.canvas)
+        const canvas = app.canvas;
+
+        // Convert canvas to blob
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            status.textContent = '❌ Failed to capture image';
+            return;
+          }
+
+          // Create download link
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+          link.download = `webacidizator-${timestamp}.png`;
+          link.href = url;
+          link.click();
+
+          // Cleanup
+          setTimeout(() => URL.revokeObjectURL(url), 100);
+
+          status.textContent = '✅ Photo saved!';
+          setTimeout(() => status.textContent = '', 3000);
+        }, 'image/png');
+
+      } catch (error) {
+        console.error('Capture failed:', error);
+        status.textContent = '❌ Capture failed';
+        setTimeout(() => status.textContent = '', 3000);
+      }
+    };
+
+    /**
      * Main application start
      */
     const start = async () => {
@@ -264,7 +393,8 @@ void main(void) {
         await app.init({
           resizeTo: container,
           backgroundAlpha: 0,
-          antialias: true
+          antialias: true,
+          preserveDrawingBuffer: true // Important for capturing
         });
         app.ticker.maxFPS = CONFIG.FPS;
         container.replaceChildren(app.canvas);
@@ -282,8 +412,12 @@ void main(void) {
         sprite.filters = [colorMatrix, noiseFilter, pixelSortFilter];
         app.stage.addChild(sprite);
 
+        // Enable capture button
+        captureBtn.disabled = false;
+        captureBtn.addEventListener('click', () => capturePhoto(app));
+
         /**
-         * Resize sprite to fit container while maintaining aspect ratio
+         * Resize sprite to fill container (cover mode)
          */
         const resizeSprite = () => {
           const { width, height } = app.renderer;
@@ -294,12 +428,15 @@ void main(void) {
           const videoAspect = videoWidth / videoHeight;
           const viewAspect = width / height;
 
+          // Use "cover" scaling - fill entire canvas, may crop edges
           if (viewAspect > videoAspect) {
-            sprite.height = height * CONFIG.SCALE_FACTOR;
-            sprite.width = sprite.height * videoAspect;
-          } else {
+            // Canvas is wider than video - fit to width
             sprite.width = width * CONFIG.SCALE_FACTOR;
             sprite.height = sprite.width / videoAspect;
+          } else {
+            // Canvas is taller than video - fit to height
+            sprite.height = height * CONFIG.SCALE_FACTOR;
+            sprite.width = sprite.height * videoAspect;
           }
         };
 
