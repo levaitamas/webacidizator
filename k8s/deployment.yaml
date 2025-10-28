@@ -31,6 +31,8 @@ spec:
       - name: webacidizator
         image: webacidizator:latest
         imagePullPolicy: IfNotPresent
+        # image: localhost/webacidizator:latest
+        # imagePullPolicy: Never
         ports:
         - name: http
           containerPort: 8080
