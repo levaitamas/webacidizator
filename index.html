@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PixiJS Webcam Effects</title>
+  <title>WebAcidizator</title>
   <style>
     :root {
       color-scheme: dark;
@@ -71,7 +71,8 @@
       Texture,
       ColorMatrixFilter,
       NoiseFilter,
-      Filter
+      Filter,
+      GlProgram
     } from "https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.mjs";
 
     const container = document.getElementById("app");
@@ -119,54 +120,124 @@
 
         const noiseFilter = new NoiseFilter({ noise: 0.22 });
 
-	// Pixel Sort Shader (GLSL)
-	const pixelSortFrag = `
-	precision mediump float;
-	varying vec2 vUv;
-	uniform sampler2D uSampler;
-	uniform vec4 inputSize;
-	uniform float minThreshold;
-	uniform float maxThreshold;
+        const vertex = `
+        precision highp float;
 
-	float luminance(vec3 color) {
-	  return dot(color, vec3(0.299, 0.587, 0.114));
-	}
+        in vec2 aPosition;
+        out vec2 vTextureCoord;
+        uniform vec4 uInputSize;
+        uniform vec4 uOutputFrame;
+        uniform vec4 uOutputTexture;
 
-	void main() {
-	  vec2 uv = vUv;
-	  vec4 current = texture2D(uSampler, uv);
-	  float luma = luminance(current.rgb);
-	  float texelY = inputSize.w;
+        vec4 filterVertexPosition(void) {
+          vec2 position = aPosition * uOutputFrame.zw + uOutputFrame.xy;
+          position.x = position.x * (2.0 / uOutputTexture.x) - 1.0;
+          position.y = position.y * (2.0 * uOutputTexture.z / uOutputTexture.y) - uOutputTexture.z;
+          return vec4(position, 0.0, 1.0);
+        }
 
-	  // Look one pixel above
-	  vec4 above = texture2D(uSampler, vec2(uv.x, uv.y - texelY));
-	  float aboveLuma = luminance(above.rgb);
+        vec2 filterTextureCoord(void) {
+          return aPosition * (uOutputFrame.zw * uInputSize.zw);
+        }
 
-	  bool within = (luma >= minThreshold && luma <= maxThreshold) &&
-	                (aboveLuma >= minThreshold && aboveLuma <= maxThreshold);
+        void main(void) {
+          gl_Position = filterVertexPosition();
+          vTextureCoord = filterTextureCoord();
+        }
+        `;
 
-	  // Sort by luminance (descending)
-	  if (within && luma < aboveLuma) {
-	    gl_FragColor = above;
-	  } else {
-	    gl_FragColor = current;
-	  }
-	}
-	`;
+        const fragment = `
+        precision highp float;
 
-	// Create Pixel Sort Filter
-	const pixelSortFilter = Filter.from({
-	  fragment: pixelSortFrag,
-	  resources: {
-	    uniforms: {
-	      minThreshold: { value: 0.15, type: "f32" }, // normalized 0-1 range
-	      maxThreshold: { value: 0.68, type: "f32" },
-	      inputSize: { value: new Float32Array([0, 0, 0, 1.0 / webcam.videoHeight || 480]) },
-	    },
-	  },
-	});
+        in vec2 vTextureCoord;
+        uniform sampler2D uTexture;
+        uniform vec4 uInputSize;
+        uniform float uMinThreshold;
+        uniform float uMaxThreshold;
+        uniform float uSpread;
 
-	sprite.filters = [colorMatrix, noiseFilter, pixelSortFilter];
+        float luminance(vec3 color) {
+          return dot(color, vec3(0.2126, 0.7152, 0.0722));
+        }
+
+        void main(void) {
+          vec2 uv = vTextureCoord;
+          vec4 base = texture(uTexture, uv);
+          float baseLuma = luminance(base.rgb);
+
+          // Early exit if outside threshold range
+          if (baseLuma < uMinThreshold || baseLuma > uMaxThreshold) {
+            gl_FragColor = base;
+            return;
+          }
+
+          // Calculate texel size
+          vec2 texelSize = vec2(1.0) / uInputSize.xy;
+
+          // Clamp spread as float, then convert to int
+          float spreadClamped = clamp(uSpread, 1.0, 64.0);
+          int steps = int(spreadClamped);
+
+          vec4 brightest = base;
+          float brightestLuma = baseLuma;
+          vec4 darkest = base;
+          float darkestLuma = baseLuma;
+
+          // Sample pixels above and below
+          for (int i = 1; i <= 64; i++) {
+            if (i > steps) break;
+
+            float offset = float(i) * texelSize.y;
+
+            // Sample below
+            vec2 downUv = uv + vec2(0.0, offset);
+            if (downUv.y <= 1.0) {
+              vec4 sample = texture(uTexture, downUv);
+              float luma = luminance(sample.rgb);
+              if (luma >= uMinThreshold && luma <= uMaxThreshold) {
+                if (luma > brightestLuma) {
+                  brightest = sample;
+                  brightestLuma = luma;
+                }
+              }
+            }
+
+            // Sample above
+            vec2 upUv = uv - vec2(0.0, offset);
+            if (upUv.y >= 0.0) {
+              vec4 sample = texture(uTexture, upUv);
+              float luma = luminance(sample.rgb);
+              if (luma >= uMinThreshold && luma <= uMaxThreshold) {
+                if (luma < darkestLuma) {
+                  darkest = sample;
+                  darkestLuma = luma;
+                }
+              }
+            }
+          }
+
+          // Mix between darkest and brightest based on current luminance
+          float mixFactor = smoothstep(uMinThreshold, uMaxThreshold, baseLuma);
+          gl_FragColor = mix(darkest, brightest, mixFactor);
+        }
+        `;
+
+        // Create pixel sort filter with uniforms
+        const pixelSortFilter = new Filter({
+          glProgram: new GlProgram({
+            fragment,
+            vertex,
+          }),
+          resources: {
+            pixelSortUniforms: {
+              uMinThreshold: { value: 0.2, type: 'f32' },
+              uMaxThreshold: { value: 0.7, type: 'f32' },
+              uSpread: { value: 30.0, type: 'f32' },
+            }
+          },
+        });
+
+        sprite.filters = [colorMatrix, noiseFilter, pixelSortFilter];
 
         app.stage.addChild(sprite);
 
@@ -203,11 +274,6 @@
             texture.baseTexture.resource?.update?.();
           }
           noiseFilter.seed = Math.random();
-
-	  pixelSortFilter.resources.uniforms.inputSize.value =
-              new Float32Array(
-	          [app.renderer.width, app.renderer.height, 0, 1.0 / (webcam.videoHeight || 480)]
-	      );
         });
       } catch (error) {
         console.error("Unable to start webcam:", error);
