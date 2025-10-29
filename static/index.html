@@ -1,15 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WebAcidizator</title>
   <style>
     :root {
       color-scheme: dark;
     }
 
-    * {
+    *,
+    *::before,
+    *::after {
       box-sizing: border-box;
     }
 
@@ -102,10 +104,7 @@
 
     .flash {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      inset: 0;
       background: white;
       opacity: 0;
       pointer-events: none;
@@ -136,6 +135,7 @@
       font-size: 0.875rem;
       color: #94a3b8;
       text-align: center;
+      min-height: 1.25rem;
     }
   </style>
 </head>
@@ -144,7 +144,7 @@
     <div id="app"></div>
     <div class="controls">
       <button id="captureBtn" disabled>Capture Photo</button>
-      <button id="switchCameraBtn" disabled>Switch Camera</button>
+      <button id="switchCameraBtn" disabled style="display: none;">Switch Camera</button>
     </div>
     <div class="status" id="status"></div>
   </div>
@@ -162,7 +162,10 @@
       GlProgram
     } from "https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.mjs";
 
-    // Configuration constants
+    // ============================================================================
+    // Configuration
+    // ============================================================================
+
     const CONFIG = {
       FPS: 15,
       SCALE_FACTOR: 1,
@@ -172,10 +175,34 @@
         MIN_THRESHOLD_RANGE: [0.1, 0.3],
         MAX_THRESHOLD_RANGE: [0.5, 1.0],
         SPREAD_RANGE: [15, 65]
+      },
+      DELAYS: {
+        CLEANUP: 100,
+        STREAM_STABILITY: 200,
+        FLASH_DURATION: 100,
+        STATUS_MESSAGE: 2000,
+        ERROR_MESSAGE: 3000,
+        URL_REVOKE: 100
       }
     };
 
-    // Shader source code
+    const ERROR_MESSAGES = {
+      NotAllowedError: "Camera permission denied",
+      NotFoundError: "No camera found",
+      NotReadableError: "Camera already in use",
+      OverconstrainedError: "Requested camera not available"
+    };
+
+    const STARTUP_ERROR_MESSAGES = {
+      NotAllowedError: "Please allow camera access and refresh the page.",
+      NotFoundError: "No camera found on your device.",
+      NotReadableError: "Camera is already in use by another application."
+    };
+
+    // ============================================================================
+    // GLSL Shaders
+    // ============================================================================
+
     const SHADERS = {
       vertex: `
 precision highp float;
@@ -266,27 +293,42 @@ void main(void) {
 }`
     };
 
-    const container = document.getElementById("app");
-    const webcam = document.getElementById("webcam");
-    const captureBtn = document.getElementById("captureBtn");
-    const switchCameraBtn = document.getElementById("switchCameraBtn");
-    const flash = document.getElementById("flash");
-    const status = document.getElementById("status");
+    // ============================================================================
+    // DOM Elements
+    // ============================================================================
 
-    // State for camera and rendering management
-    let currentStream = null;
-    let availableCameras = [];
-    let currentCameraIndex = 0;
-    let app = null;
-    let sprite = null;
-    let texture = null;
-    let colorMatrix = null;
-    let noiseFilter = null;
-    let pixelSortFilter = null;
-    let resizeHandler = null;
+    const DOM = {
+      container: document.getElementById("app"),
+      webcam: document.getElementById("webcam"),
+      captureBtn: document.getElementById("captureBtn"),
+      switchCameraBtn: document.getElementById("switchCameraBtn"),
+      flash: document.getElementById("flash"),
+      status: document.getElementById("status")
+    };
+
+    // ============================================================================
+    // Application State
+    // ============================================================================
+
+    const state = {
+      currentStream: null,
+      availableCameras: [],
+      currentCameraIndex: 0,
+      app: null,
+      sprite: null,
+      texture: null,
+      colorMatrix: null,
+      noiseFilter: null,
+      pixelSortFilter: null,
+      resizeHandler: null
+    };
+
+    // ============================================================================
+    // Utility Functions
+    // ============================================================================
 
     const showError = (message) => {
-      container.innerHTML = `
+      DOM.container.innerHTML = `
         <div class="error">
           <strong>Camera Access Needed</strong>
           <span>${message}</span>
@@ -296,13 +338,27 @@ void main(void) {
 
     const randomInRange = (min, max) => min + Math.random() * (max - min);
 
+    const setStatus = (message, duration = 0) => {
+      DOM.status.textContent = message;
+      if (duration > 0) {
+        setTimeout(() => { DOM.status.textContent = ''; }, duration);
+      }
+    };
+
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    // ============================================================================
+    // Filter Creation
+    // ============================================================================
+
     const createColorMatrix = () => {
       const filter = new ColorMatrixFilter();
+      // Remove green channel for cyan/magenta color scheme
       filter.matrix = [
-        1, 0, 0, 0, 0,
-        0, 0, 0, 0, 0,
-        0, 0, 1, 0, 0,
-        0, 0, 0, 1, 0
+        1, 0, 0, 0, 0,  // Red
+        0, 0, 0, 0, 0,  // Green (disabled)
+        0, 0, 1, 0, 0,  // Blue
+        0, 0, 0, 1, 0   // Alpha
       ];
       return filter;
     };
@@ -325,81 +381,61 @@ void main(void) {
 
     const randomizePixelSortParams = (filter) => {
       if (!filter?.uniforms) return;
+
       const { MIN_THRESHOLD_RANGE, MAX_THRESHOLD_RANGE, SPREAD_RANGE } = CONFIG.PIXEL_SORT;
       filter.uniforms.uMinThreshold = randomInRange(...MIN_THRESHOLD_RANGE);
       filter.uniforms.uMaxThreshold = randomInRange(...MAX_THRESHOLD_RANGE);
       filter.uniforms.uSpread = randomInRange(...SPREAD_RANGE);
     };
 
+    // ============================================================================
+    // Photo Capture
+    // ============================================================================
+
     const playFlashEffect = () => {
-      flash.classList.add('active');
-      setTimeout(() => flash.classList.remove('active'), 100);
+      DOM.flash.classList.add('active');
+      setTimeout(() => DOM.flash.classList.remove('active'), CONFIG.DELAYS.FLASH_DURATION);
     };
 
     const capturePhoto = () => {
       try {
         playFlashEffect();
-        const canvas = app.canvas;
-        canvas.toBlob((blob) => {
+
+        state.app.canvas.toBlob((blob) => {
           if (!blob) {
-            status.textContent = '❌ Failed to capture image';
+            setStatus('❌ Failed to capture image');
             return;
           }
+
           const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
           const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+
           link.download = `webacidizator-${timestamp}.png`;
           link.href = url;
           link.click();
-          setTimeout(() => URL.revokeObjectURL(url), 100);
-          status.textContent = '✅ Photo saved!';
-          setTimeout(() => status.textContent = '', 3000);
+
+          setTimeout(() => URL.revokeObjectURL(url), CONFIG.DELAYS.URL_REVOKE);
+          setStatus('✅ Photo saved!', CONFIG.DELAYS.ERROR_MESSAGE);
         }, 'image/png');
       } catch (error) {
         console.error('Capture failed:', error);
-        status.textContent = '❌ Capture failed';
-        setTimeout(() => status.textContent = '', 3000);
+        setStatus('❌ Capture failed', CONFIG.DELAYS.ERROR_MESSAGE);
       }
     };
+
+    // ============================================================================
+    // Camera Management
+    // ============================================================================
 
     const stopStream = () => {
-      if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop());
-        currentStream = null;
+      if (state.currentStream) {
+        state.currentStream.getTracks().forEach(track => track.stop());
+        state.currentStream = null;
       }
     };
 
-    const getAvailableCameras = async () => {
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(device => device.kind === 'videoinput');
-        const cameraInfo = [];
-        for (let i = 0; i < videoDevices.length; i++) {
-          try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-              video: { deviceId: { exact: videoDevices[i].deviceId } }
-            });
-            const track = stream.getVideoTracks()[0];
-            const settings = track.getSettings();
-            cameraInfo.push({
-              deviceId: videoDevices[i].deviceId,
-              label: videoDevices[i].label || `Camera ${i + 1}`,
-              facingMode: settings.facingMode || 'undefined'
-            });
-            stream.getTracks().forEach(t => t.stop());
-          } catch (error) {
-            console.warn(`Could not probe camera ${i}:`, error);
-          }
-        }
-        // console.log('Available cameras:', cameraInfo);
-        return cameraInfo;
-      } catch (error) {
-        console.error('Failed to enumerate cameras:', error);
-        return [];
-      }
-    };
-
-    const getCameraStream = async (deviceId) => {
+    const getCameraStream = async (deviceId = null) => {
       const constraints = {
         video: deviceId ? { deviceId: { exact: deviceId } } : true,
         audio: false
@@ -407,87 +443,137 @@ void main(void) {
       return await navigator.mediaDevices.getUserMedia(constraints);
     };
 
+    const getAvailableCameras = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        const cameraInfo = [];
+
+        for (let i = 0; i < videoDevices.length; i++) {
+          try {
+            const stream = await getCameraStream(videoDevices[i].deviceId);
+            const track = stream.getVideoTracks()[0];
+            const settings = track.getSettings();
+
+            cameraInfo.push({
+              deviceId: videoDevices[i].deviceId,
+              label: videoDevices[i].label || `Camera ${i + 1}`,
+              facingMode: settings.facingMode || 'undefined'
+            });
+
+            stream.getTracks().forEach(t => t.stop());
+          } catch (error) {
+            console.warn(`Could not probe camera ${i}:`, error);
+          }
+        }
+
+        return cameraInfo;
+      } catch (error) {
+        console.error('Failed to enumerate cameras:', error);
+        return [];
+      }
+    };
+
+    const checkMultipleCameras = async () => {
+      try {
+        state.availableCameras = await getAvailableCameras();
+
+        if (state.currentStream) {
+          const currentTrack = state.currentStream.getVideoTracks()[0];
+          const currentSettings = currentTrack.getSettings();
+          state.currentCameraIndex = state.availableCameras.findIndex(
+            cam => cam.deviceId === currentSettings.deviceId
+          );
+          if (state.currentCameraIndex === -1) state.currentCameraIndex = 0;
+        }
+
+        DOM.switchCameraBtn.style.display = state.availableCameras.length > 1 ? 'flex' : 'none';
+      } catch (error) {
+        console.error("Failed to check cameras:", error);
+        DOM.switchCameraBtn.style.display = 'none';
+      }
+    };
+
+    // ============================================================================
+    // Rendering & Texture Management
+    // ============================================================================
+
     const createResizeHandler = () => {
       return () => {
-        if (!sprite || !app) return;
-        const { width, height } = app.renderer;
-        sprite.position.set(width / 2, height / 2);
-        const videoWidth = webcam.videoWidth || 640;
-        const videoHeight = webcam.videoHeight || 480;
+        if (!state.sprite || !state.app) return;
+
+        const { width, height } = state.app.renderer;
+        state.sprite.position.set(width / 2, height / 2);
+
+        const videoWidth = DOM.webcam.videoWidth || 640;
+        const videoHeight = DOM.webcam.videoHeight || 480;
         const videoAspect = videoWidth / videoHeight;
         const viewAspect = width / height;
+
         if (viewAspect > videoAspect) {
-          sprite.width = width * CONFIG.SCALE_FACTOR;
-          sprite.height = sprite.width / videoAspect;
+          state.sprite.width = width * CONFIG.SCALE_FACTOR;
+          state.sprite.height = state.sprite.width / videoAspect;
         } else {
-          sprite.height = height * CONFIG.SCALE_FACTOR;
-          sprite.width = sprite.height * videoAspect;
+          state.sprite.height = height * CONFIG.SCALE_FACTOR;
+          state.sprite.width = state.sprite.height * videoAspect;
         }
       };
     };
 
     const updateVideoTexture = async () => {
       try {
-        // CRITICAL FIX: Pause video to stop PixiJS events
-        webcam.pause();
+        // Pause video to stop PixiJS event handlers
+        DOM.webcam.pause();
+        state.app.ticker.stop();
 
-        // Stop ticker
-        app.ticker.stop();
+        await delay(CONFIG.DELAYS.CLEANUP);
 
-        // Small delay for cleanup
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Destroy old resources
-        if (texture) {
-          texture.destroy(true);
-          texture = null;
+        // Cleanup old resources
+        if (state.texture) {
+          state.texture.destroy(true);
+          state.texture = null;
         }
-        if (sprite) {
-          if (app.stage.children.includes(sprite)) {
-            app.stage.removeChild(sprite);
+
+        if (state.sprite) {
+          if (state.app.stage.children.includes(state.sprite)) {
+            state.app.stage.removeChild(state.sprite);
           }
-          sprite.destroy({ children: true });
-          sprite = null;
+          state.sprite.destroy({ children: true });
+          state.sprite = null;
         }
 
-        // Clear the stage
-        app.renderer.clear();
+        state.app.renderer.clear();
 
-        // Resume video playback with new stream
-        await webcam.play();
+        // Resume video with new stream
+        await DOM.webcam.play();
 
-        // Wait for video to be ready
-        if (webcam.readyState < 3) {
+        // Wait for video ready state
+        if (DOM.webcam.readyState < 3) {
           await new Promise((resolve) => {
-            webcam.addEventListener('canplay', resolve, { once: true });
+            DOM.webcam.addEventListener('canplay', resolve, { once: true });
           });
         }
 
-        // Additional delay for stream stability
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await delay(CONFIG.DELAYS.STREAM_STABILITY);
 
         // Create fresh texture and sprite
-        texture = Texture.from(webcam);
-        sprite = new Sprite(texture);
-        sprite.anchor.set(0.5);
-        sprite.filters = [colorMatrix, noiseFilter, pixelSortFilter];
-        app.stage.addChild(sprite);
+        state.texture = Texture.from(DOM.webcam);
+        state.sprite = new Sprite(state.texture);
+        state.sprite.anchor.set(0.5);
+        state.sprite.filters = [state.colorMatrix, state.noiseFilter, state.pixelSortFilter];
+        state.app.stage.addChild(state.sprite);
 
-        // Resize
-        if (resizeHandler) {
-          resizeHandler();
+        // Resize and render
+        if (state.resizeHandler) {
+          state.resizeHandler();
         }
 
-        // Force one render
-        app.renderer.render(app.stage);
-
-        // Resume ticker
-        app.ticker.start();
-
+        state.app.renderer.render(state.app.stage);
+        state.app.ticker.start();
       } catch (error) {
         console.error('Failed to update video texture:', error);
-        if (app && app.ticker) {
-          app.ticker.start();
+        if (state.app?.ticker) {
+          state.app.ticker.start();
         }
         throw error;
       }
@@ -495,146 +581,138 @@ void main(void) {
 
     const switchCamera = async () => {
       try {
-        switchCameraBtn.disabled = true;
-        captureBtn.disabled = true;
-        status.textContent = '🔄 Switching camera...';
+        DOM.switchCameraBtn.disabled = true;
+        DOM.captureBtn.disabled = true;
+        setStatus('🔄 Switching camera...');
 
-        currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
-        const nextCamera = availableCameras[currentCameraIndex];
+        state.currentCameraIndex = (state.currentCameraIndex + 1) % state.availableCameras.length;
+        const nextCamera = state.availableCameras[state.currentCameraIndex];
 
-        // Stop old stream
         stopStream();
 
-        // Get new stream
         const stream = await getCameraStream(nextCamera.deviceId);
-        currentStream = stream;
+        state.currentStream = stream;
+        DOM.webcam.srcObject = stream;
 
-        // Set new stream on video element (but don't play yet)
-        webcam.srcObject = stream;
-
-        // Now update the texture (this will handle play/pause)
         await updateVideoTexture();
 
-        status.textContent = `✅ ${nextCamera.label}`;
-        setTimeout(() => status.textContent = '', 2000);
-
+        setStatus(`✅ ${nextCamera.label}`, CONFIG.DELAYS.STATUS_MESSAGE);
       } catch (error) {
         console.error("Camera switch failed:", error);
-        const errorMessages = {
-          NotAllowedError: "Camera permission denied",
-          NotFoundError: "No camera found",
-          NotReadableError: "Camera already in use",
-          OverconstrainedError: "Requested camera not available"
-        };
-        status.textContent = `❌ ${errorMessages[error.name] || "Camera switch failed"}`;
-        setTimeout(() => status.textContent = '', 3000);
+        const message = ERROR_MESSAGES[error.name] || "Camera switch failed";
+        setStatus(`❌ ${message}`, CONFIG.DELAYS.ERROR_MESSAGE);
       } finally {
-        switchCameraBtn.disabled = false;
-        captureBtn.disabled = false;
+        DOM.switchCameraBtn.disabled = false;
+        DOM.captureBtn.disabled = false;
       }
     };
 
-    const checkMultipleCameras = async () => {
-      try {
-        availableCameras = await getAvailableCameras();
-        if (currentStream) {
-          const currentTrack = currentStream.getVideoTracks()[0];
-          const currentSettings = currentTrack.getSettings();
-          currentCameraIndex = availableCameras.findIndex(
-            cam => cam.deviceId === currentSettings.deviceId
-          );
-          if (currentCameraIndex === -1) currentCameraIndex = 0;
-        }
-        if (availableCameras.length > 1) {
-          switchCameraBtn.style.display = 'flex';
-          // console.log(`Found ${availableCameras.length} cameras`);
-        } else {
-          switchCameraBtn.style.display = 'none';
-        }
-      } catch (error) {
-        console.error("Failed to check cameras:", error);
-        switchCameraBtn.style.display = 'none';
+    // ============================================================================
+    // Application Initialization
+    // ============================================================================
+
+    const initializePixiJS = async () => {
+      state.app = new Application();
+      await state.app.init({
+        resizeTo: DOM.container,
+        backgroundAlpha: 0,
+        antialias: true,
+        preserveDrawingBuffer: true
+      });
+      state.app.ticker.maxFPS = CONFIG.FPS;
+      DOM.container.replaceChildren(state.app.canvas);
+    };
+
+    const createFilters = () => {
+      state.colorMatrix = createColorMatrix();
+      state.noiseFilter = new NoiseFilter({ noise: CONFIG.NOISE_AMOUNT });
+      state.pixelSortFilter = createPixelSortFilter();
+    };
+
+    const setupSprite = () => {
+      state.texture = Texture.from(DOM.webcam);
+      state.sprite = new Sprite(state.texture);
+      state.sprite.anchor.set(0.5);
+      state.sprite.filters = [state.colorMatrix, state.noiseFilter, state.pixelSortFilter];
+      state.app.stage.addChild(state.sprite);
+    };
+
+    const setupEventListeners = () => {
+      DOM.captureBtn.addEventListener('click', capturePhoto);
+      DOM.switchCameraBtn.addEventListener('click', switchCamera);
+
+      state.resizeHandler = createResizeHandler();
+
+      if (DOM.webcam.readyState >= 1) {
+        state.resizeHandler();
+      } else {
+        DOM.webcam.addEventListener("loadedmetadata", state.resizeHandler, { once: true });
       }
+
+      window.addEventListener("resize", state.resizeHandler);
+      window.addEventListener('beforeunload', () => {
+        stopStream();
+        if (state.texture) {
+          state.texture.destroy(true);
+        }
+      });
+    };
+
+    const setupAnimationLoop = () => {
+      let frameCount = 0;
+
+      state.app.ticker.add(() => {
+        if (DOM.webcam.readyState >= 2 && state.texture?.source) {
+          state.texture.source.update();
+        }
+
+        state.noiseFilter.seed = Math.random();
+
+        frameCount++;
+        if (frameCount % CONFIG.PARAM_CHANGE_INTERVAL === 0) {
+          randomizePixelSortParams(state.pixelSortFilter);
+        }
+      });
     };
 
     const start = async () => {
       try {
+        // Initialize webcam
         const stream = await getCameraStream();
-        currentStream = stream;
-        webcam.srcObject = stream;
-        await webcam.play();
+        state.currentStream = stream;
+        DOM.webcam.srcObject = stream;
+        await DOM.webcam.play();
 
+        // Check for multiple cameras
         await checkMultipleCameras();
 
-        app = new Application();
-        await app.init({
-          resizeTo: container,
-          backgroundAlpha: 0,
-          antialias: true,
-          preserveDrawingBuffer: true
-        });
-        app.ticker.maxFPS = CONFIG.FPS;
-        container.replaceChildren(app.canvas);
+        // Initialize PixiJS
+        await initializePixiJS();
 
-        texture = Texture.from(webcam);
-        sprite = new Sprite(texture);
-        sprite.anchor.set(0.5);
+        // Create filters and sprite
+        createFilters();
+        setupSprite();
 
-        colorMatrix = createColorMatrix();
-        noiseFilter = new NoiseFilter({ noise: CONFIG.NOISE_AMOUNT });
-        pixelSortFilter = createPixelSortFilter();
+        // Enable controls
+        DOM.captureBtn.disabled = false;
+        DOM.switchCameraBtn.disabled = false;
 
-        sprite.filters = [colorMatrix, noiseFilter, pixelSortFilter];
-        app.stage.addChild(sprite);
+        // Setup event listeners
+        setupEventListeners();
 
-        captureBtn.disabled = false;
-        switchCameraBtn.disabled = false;
-
-        captureBtn.addEventListener('click', capturePhoto);
-        switchCameraBtn.addEventListener('click', switchCamera);
-
-        resizeHandler = createResizeHandler();
-
-        if (webcam.readyState >= 1) {
-          resizeHandler();
-        } else {
-          webcam.addEventListener("loadedmetadata", resizeHandler, { once: true });
-        }
-
-        window.addEventListener("resize", resizeHandler);
-
-        let frameCount = 0;
-
-        app.ticker.add(() => {
-          if (webcam.readyState >= 2 && texture?.source) {
-            texture.source.update();
-          }
-          noiseFilter.seed = Math.random();
-          frameCount++;
-          if (frameCount % CONFIG.PARAM_CHANGE_INTERVAL === 0) {
-            randomizePixelSortParams(pixelSortFilter);
-          }
-        });
-
-        window.addEventListener('beforeunload', () => {
-          stopStream();
-          if (texture) {
-            texture.destroy(true);
-          }
-        });
-
+        // Start animation loop
+        setupAnimationLoop();
       } catch (error) {
         console.error("Unable to start webcam:", error);
-        const errorMessages = {
-          NotAllowedError: "Please allow camera access and refresh the page.",
-          NotFoundError: "No camera found on your device.",
-          NotReadableError: "Camera is already in use by another application.",
-        };
-        const hint = errorMessages[error.name] ||
+        const hint = STARTUP_ERROR_MESSAGES[error.name] ||
           "We couldn't access your camera. Please check your browser settings.";
         showError(hint);
       }
     };
+
+    // ============================================================================
+    // Application Entry Point
+    // ============================================================================
 
     if (!navigator.mediaDevices?.getUserMedia) {
       showError("Your browser doesn't support camera access via getUserMedia.");
