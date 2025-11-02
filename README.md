@@ -5,6 +5,10 @@ A real-time webcam glitch art effect application with pixel sorting, color manip
 ![PixiJS Version](https://img.shields.io/badge/pixijs-8.x-purple)
 ![Go Version](https://img.shields.io/badge/go-1.25-blue)
 
+## Why?
+
+We ([Kinga](@kingakov) and [Tamas](@levaitamas)) had a conceptual photo project from 2015 to 2017 that centered around a faulty camera (a Samsung NV8). The camera heavily distorted colors and forms, thus creating new context and meaning. Our goal was to present this world to others. Now, nearly a decade later, we have created a digital recreation of this camera for web browsers, allowing others to photograph this alternative world.
+
 ## How It Works
 
 1. **Webcam Capture**: Requests browser webcam access (user-facing camera)
