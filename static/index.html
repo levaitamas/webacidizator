@@ -102,6 +102,20 @@
       font-size: 1.2rem;
     }
 
+    #aboutBtn {
+      position: fixed;
+      top: 1.5rem;
+      left: 1.5rem;
+      padding: 0.75rem 1.5rem;
+      font-size: 0.875rem;
+      z-index: 100;
+    }
+
+    #aboutBtn::before {
+      content: "ℹ️";
+      font-size: 1rem;
+    }
+
     .flash {
       position: fixed;
       inset: 0;
@@ -109,6 +123,7 @@
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.1s ease;
+      z-index: 50;
     }
 
     .flash.active {
@@ -137,9 +152,151 @@
       text-align: center;
       min-height: 1.25rem;
     }
+
+    /* Modal Styles */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border-radius: 20px;
+      padding: 2rem;
+      max-width: 600px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      position: relative;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: white;
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      padding: 0;
+    }
+
+    .modal-close:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: rotate(90deg);
+    }
+
+    .modal-header {
+      margin-bottom: 1.5rem;
+      padding-right: 2rem;
+    }
+
+    .modal-header h2 {
+      margin: 0 0 0.5rem 0;
+      font-size: 2rem;
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .modal-header p {
+      margin: 0;
+      color: #94a3b8;
+      font-size: 0.875rem;
+    }
+
+    .modal-body {
+      line-height: 1.6;
+    }
+
+    .modal-body h3 {
+      margin: 1.5rem 0 0.75rem 0;
+      font-size: 1.125rem;
+      color: #6366f1;
+    }
+
+    .modal-body h3:first-child {
+      margin-top: 0;
+    }
+
+    .modal-body p {
+      margin: 0 0 1rem 0;
+      color: #cbd5e1;
+    }
+
+    .modal-body ul {
+      margin: 0 0 1rem 0;
+      padding-left: 1.5rem;
+      color: #cbd5e1;
+    }
+
+    .modal-body li {
+      margin-bottom: 0.5rem;
+    }
+
+    .modal-body a {
+      color: #6366f1;
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+
+    .modal-body a:hover {
+      color: #8b5cf6;
+    }
+
+    .modal-footer {
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      text-align: center;
+      color: #64748b;
+      font-size: 0.875rem;
+    }
+
+    /* Scrollbar styling */
+    .modal-content::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .modal-content::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+    }
+
+    .modal-content::-webkit-scrollbar-thumb {
+      background: rgba(99, 102, 241, 0.5);
+      border-radius: 4px;
+    }
+
+    .modal-content::-webkit-scrollbar-thumb:hover {
+      background: rgba(99, 102, 241, 0.7);
+    }
   </style>
 </head>
 <body>
+  <button id="aboutBtn">About</button>
+
   <div id="container">
     <div id="app"></div>
     <div class="controls">
@@ -148,8 +305,34 @@
     </div>
     <div class="status" id="status"></div>
   </div>
+
   <video id="webcam" autoplay playsinline muted></video>
   <div class="flash" id="flash"></div>
+
+  <!-- About Modal -->
+  <div id="aboutModal" class="modal">
+    <div class="modal-content">
+      <button class="modal-close" id="closeModal" aria-label="Close">×</button>
+
+      <div class="modal-header">
+        <h2>WebAcidizator</h2>
+        <p>A digital recreation of a faulty camera named the <i>Acidizator</i></p>
+      </div>
+
+      <div class="modal-body">
+        <h3>About</h3>
+	 <p>
+	 We (Kinga and Tamas) had a conceptual photo project from 2015 to 2017 that centered around a faulty camera (a Samsung NV8). The camera heavily distorted colors and forms, thus creating new context and meaning. Our goal was to present this world to others. Now, nearly a decade later, we have created a digital recreation of this camera for web browsers, allowing others to photograph this alternative world.
+       </p>
+
+        <h3>More Information</h3>
+        <ul>
+          <li><strong>README:</strong> <a href="https://github.com/levaitamas/webacidizator/blob/main/README.md">link</a></li>
+          <li><strong>Source Code:</strong> <a href="https://github.com/levaitamas/webacidizator">GitHub repository</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
 
   <script type="module">
     import {
@@ -302,8 +485,11 @@ void main(void) {
       webcam: document.getElementById("webcam"),
       captureBtn: document.getElementById("captureBtn"),
       switchCameraBtn: document.getElementById("switchCameraBtn"),
+      aboutBtn: document.getElementById("aboutBtn"),
       flash: document.getElementById("flash"),
-      status: document.getElementById("status")
+      status: document.getElementById("status"),
+      aboutModal: document.getElementById("aboutModal"),
+      closeModal: document.getElementById("closeModal")
     };
 
     // ============================================================================
@@ -322,6 +508,40 @@ void main(void) {
       pixelSortFilter: null,
       resizeHandler: null
     };
+
+    // ============================================================================
+    // Modal Functions
+    // ============================================================================
+
+    const openModal = () => {
+      DOM.aboutModal.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    };
+
+    const closeModal = () => {
+      DOM.aboutModal.classList.remove('active');
+      document.body.style.overflow = '';
+    };
+
+    // Close modal when clicking outside content
+    DOM.aboutModal.addEventListener('click', (e) => {
+      if (e.target === DOM.aboutModal) {
+        closeModal();
+      }
+    });
+
+    // Close modal with close button
+    DOM.closeModal.addEventListener('click', closeModal);
+
+    // Close modal with Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && DOM.aboutModal.classList.contains('active')) {
+        closeModal();
+      }
+    });
+
+    // Open modal with About button
+    DOM.aboutBtn.addEventListener('click', openModal);
 
     // ============================================================================
     // Utility Functions
@@ -353,12 +573,11 @@ void main(void) {
 
     const createColorMatrix = () => {
       const filter = new ColorMatrixFilter();
-      // Remove green channel for cyan/magenta color scheme
       filter.matrix = [
-        1, 0, 0, 0, 0,  // Red
-        0, 0, 0, 0, 0,  // Green (disabled)
-        0, 0, 1, 0, 0,  // Blue
-        0, 0, 0, 1, 0   // Alpha
+        1, 0, 0, 0, 0,
+        0, 0, 0, 0, 0,
+        0, 0, 1, 0, 0,
+        0, 0, 0, 1, 0
       ];
       return filter;
     };
@@ -522,13 +741,11 @@ void main(void) {
 
     const updateVideoTexture = async () => {
       try {
-        // Pause video to stop PixiJS event handlers
         DOM.webcam.pause();
         state.app.ticker.stop();
 
         await delay(CONFIG.DELAYS.CLEANUP);
 
-        // Cleanup old resources
         if (state.texture) {
           state.texture.destroy(true);
           state.texture = null;
@@ -544,10 +761,8 @@ void main(void) {
 
         state.app.renderer.clear();
 
-        // Resume video with new stream
         await DOM.webcam.play();
 
-        // Wait for video ready state
         if (DOM.webcam.readyState < 3) {
           await new Promise((resolve) => {
             DOM.webcam.addEventListener('canplay', resolve, { once: true });
@@ -556,14 +771,12 @@ void main(void) {
 
         await delay(CONFIG.DELAYS.STREAM_STABILITY);
 
-        // Create fresh texture and sprite
         state.texture = Texture.from(DOM.webcam);
         state.sprite = new Sprite(state.texture);
         state.sprite.anchor.set(0.5);
         state.sprite.filters = [state.colorMatrix, state.noiseFilter, state.pixelSortFilter];
         state.app.stage.addChild(state.sprite);
 
-        // Resize and render
         if (state.resizeHandler) {
           state.resizeHandler();
         }
@@ -677,30 +890,23 @@ void main(void) {
 
     const start = async () => {
       try {
-        // Initialize webcam
         const stream = await getCameraStream();
         state.currentStream = stream;
         DOM.webcam.srcObject = stream;
         await DOM.webcam.play();
 
-        // Check for multiple cameras
         await checkMultipleCameras();
 
-        // Initialize PixiJS
         await initializePixiJS();
 
-        // Create filters and sprite
         createFilters();
         setupSprite();
 
-        // Enable controls
         DOM.captureBtn.disabled = false;
         DOM.switchCameraBtn.disabled = false;
 
-        // Setup event listeners
         setupEventListeners();
 
-        // Start animation loop
         setupAnimationLoop();
       } catch (error) {
         console.error("Unable to start webcam:", error);
