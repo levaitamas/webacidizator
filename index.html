@@ -761,27 +761,11 @@ void main(void) {
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
-        const cameraInfo = [];
 
-        for (let i = 0; i < videoDevices.length; i++) {
-          try {
-            const stream = await getCameraStream(videoDevices[i].deviceId);
-            const track = stream.getVideoTracks()[0];
-            const settings = track.getSettings();
-
-            cameraInfo.push({
-              deviceId: videoDevices[i].deviceId,
-              label: videoDevices[i].label || `Camera ${i + 1}`,
-              facingMode: settings.facingMode || 'undefined'
-            });
-
-            stream.getTracks().forEach(t => t.stop());
-          } catch (error) {
-            console.warn(`Could not probe camera ${i}:`, error);
-          }
-        }
-
-        return cameraInfo;
+        return videoDevices.map((device, i) => ({
+          deviceId: device.deviceId,
+          label: device.label || `Camera ${i + 1}`
+        }));
       } catch (error) {
         console.error('Failed to enumerate cameras:', error);
         return [];
