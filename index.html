@@ -153,6 +153,52 @@
       min-height: 1.25rem;
     }
 
+    #cameraControls {
+      display: none;
+      align-items: flex-end;
+      gap: 1rem;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.375rem;
+    }
+
+    .control-group label,
+    .control-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .control-group input[type="range"] {
+      width: 150px;
+      accent-color: #8b5cf6;
+      cursor: pointer;
+    }
+
+    .control-group .value {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      font-variant-numeric: tabular-nums;
+    }
+
+    button.compact {
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+    }
+
+    button.compact.active {
+      background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+    }
+
     /* Modal Styles */
     .modal {
       position: fixed;
@@ -303,6 +349,35 @@
       <button id="captureBtn" type="button" disabled>Capture Photo</button>
       <button id="switchCameraBtn" type="button" disabled style="display: none;">Switch Camera</button>
     </div>
+    <div class="controls" id="cameraControls">
+      <div class="control-group" id="zoomGroup" style="display: none;">
+        <label for="zoomSlider">Zoom</label>
+        <input type="range" id="zoomSlider" min="1" max="10" step="0.1" value="1">
+        <span class="value" id="zoomValue">1.0×</span>
+      </div>
+      <div class="control-group" id="torchGroup" style="display: none;">
+        <span class="control-label">Torch</span>
+        <button id="torchBtn" type="button" class="compact" aria-pressed="false">🔦 Off</button>
+      </div>
+      <div class="control-group" id="focusGroup" style="display: none;">
+        <span class="control-label">Focus</span>
+        <button id="focusBtn" type="button" class="compact">🎯 Continuous</button>
+      </div>
+      <div class="control-group" id="focusDistanceGroup" style="display: none;">
+        <label for="focusDistanceSlider">Focus Distance</label>
+        <input type="range" id="focusDistanceSlider" min="0" max="1" step="0.01" value="0">
+        <span class="value" id="focusDistanceValue">0.00</span>
+      </div>
+      <div class="control-group" id="exposureGroup" style="display: none;">
+        <span class="control-label">Exposure</span>
+        <button id="exposureBtn" type="button" class="compact">☀️ Auto</button>
+      </div>
+      <div class="control-group" id="exposureCompGroup" style="display: none;">
+        <label for="exposureCompSlider">Compensation</label>
+        <input type="range" id="exposureCompSlider" min="-2" max="2" step="0.1" value="0">
+        <span class="value" id="exposureCompValue">0.0</span>
+      </div>
+    </div>
     <div class="status" id="status"></div>
   </div>
 
@@ -381,6 +456,9 @@
       NotFoundError: "No camera found on your device.",
       NotReadableError: "Camera is already in use by another application."
     };
+
+    const FOCUS_MODE_ORDER = ["continuous", "single", "manual"];
+    const EXPOSURE_MODE_ORDER = ["auto", "manual"];
 
     // ============================================================================
     // GLSL Shaders
@@ -489,7 +567,23 @@ void main(void) {
       flash: document.getElementById("flash"),
       status: document.getElementById("status"),
       aboutModal: document.getElementById("aboutModal"),
-      closeModal: document.getElementById("closeModal")
+      closeModal: document.getElementById("closeModal"),
+      cameraControls: document.getElementById("cameraControls"),
+      zoomGroup: document.getElementById("zoomGroup"),
+      zoomSlider: document.getElementById("zoomSlider"),
+      zoomValue: document.getElementById("zoomValue"),
+      torchGroup: document.getElementById("torchGroup"),
+      torchBtn: document.getElementById("torchBtn"),
+      focusGroup: document.getElementById("focusGroup"),
+      focusBtn: document.getElementById("focusBtn"),
+      focusDistanceGroup: document.getElementById("focusDistanceGroup"),
+      focusDistanceSlider: document.getElementById("focusDistanceSlider"),
+      focusDistanceValue: document.getElementById("focusDistanceValue"),
+      exposureGroup: document.getElementById("exposureGroup"),
+      exposureBtn: document.getElementById("exposureBtn"),
+      exposureCompGroup: document.getElementById("exposureCompGroup"),
+      exposureCompSlider: document.getElementById("exposureCompSlider"),
+      exposureCompValue: document.getElementById("exposureCompValue")
     };
 
     // ============================================================================
@@ -506,7 +600,8 @@ void main(void) {
       colorMatrix: null,
       noiseFilter: null,
       pixelSortFilter: null,
-      resizeHandler: null
+      resizeHandler: null,
+      cameraCapabilities: null
     };
 
     // ============================================================================
@@ -714,6 +809,175 @@ void main(void) {
     };
 
     // ============================================================================
+    // Camera Controls (zoom, torch, focus, exposure)
+    // ============================================================================
+
+    const getVideoTrack = () => state.currentStream?.getVideoTracks()[0] || null;
+
+    const clampToCapability = (value, cap) => {
+      let clamped = Math.min(Math.max(value, cap.min), cap.max);
+      if (cap.step) {
+        clamped = cap.min + Math.round((clamped - cap.min) / cap.step) * cap.step;
+      }
+      return Math.round(clamped * 1000) / 1000;
+    };
+
+    const rangeCapability = (cap) =>
+      cap && typeof cap === 'object' && cap.min < cap.max ? cap : null;
+
+    const supportedFocusModes = () =>
+      FOCUS_MODE_ORDER.filter(mode => state.cameraCapabilities?.focusMode?.includes(mode));
+
+    const supportedExposureModes = () =>
+      EXPOSURE_MODE_ORDER.filter(mode => state.cameraCapabilities?.exposureMode?.includes(mode));
+
+    const applyCameraConstraint = async (constraints) => {
+      const track = getVideoTrack();
+      if (!track?.applyConstraints) return false;
+      try {
+        await track.applyConstraints(constraints);
+        updateCameraControlsUI();
+        return true;
+      } catch (error) {
+        console.warn('Camera control change failed:', error);
+        const message = error.name === 'OverconstrainedError'
+          ? 'Camera control not supported on this device'
+          : 'Camera control change failed';
+        setStatus(`❌ ${message}`, CONFIG.DELAYS.ERROR_MESSAGE);
+        return false;
+      }
+    };
+
+    const detectCameraCapabilities = () => {
+      const track = getVideoTrack();
+      state.cameraCapabilities = typeof track?.getCapabilities === 'function'
+        ? track.getCapabilities()
+        : null;
+      updateCameraControlsUI();
+    };
+
+    const updateCameraControlsUI = () => {
+      const caps = state.cameraCapabilities;
+      const settings = getVideoTrack()?.getSettings() || {};
+      const visibleGroups = [];
+
+      const zoomCap = rangeCapability(caps?.zoom);
+      DOM.zoomGroup.style.display = zoomCap ? 'flex' : 'none';
+      if (zoomCap) {
+        DOM.zoomSlider.min = zoomCap.min;
+        DOM.zoomSlider.max = zoomCap.max;
+        DOM.zoomSlider.step = zoomCap.step || 0.1;
+        const zoom = settings.zoom ?? zoomCap.min;
+        DOM.zoomSlider.value = zoom;
+        DOM.zoomValue.textContent = `${Number(zoom) % 1 === 0 ? Number(zoom).toFixed(1) : Number(zoom).toFixed(2)}×`;
+        visibleGroups.push(DOM.zoomGroup);
+      }
+
+      const hasTorch = caps?.torch === true;
+      DOM.torchGroup.style.display = hasTorch ? 'flex' : 'none';
+      if (hasTorch) {
+        const torchOn = settings.torch === true;
+        DOM.torchBtn.classList.toggle('active', torchOn);
+        DOM.torchBtn.setAttribute('aria-pressed', String(torchOn));
+        DOM.torchBtn.textContent = torchOn ? '🔦 On' : '🔦 Off';
+        visibleGroups.push(DOM.torchGroup);
+      }
+
+      const focusModes = supportedFocusModes();
+      DOM.focusGroup.style.display = focusModes.length >= 2 ? 'flex' : 'none';
+      if (focusModes.length >= 2) {
+        const mode = focusModes.includes(settings.focusMode) ? settings.focusMode : focusModes[0];
+        DOM.focusBtn.textContent = `🎯 ${mode[0].toUpperCase()}${mode.slice(1)}`;
+        visibleGroups.push(DOM.focusGroup);
+      }
+
+      const focusDistanceCap = rangeCapability(caps?.focusDistance);
+      const manualFocus = settings.focusMode === 'manual';
+      DOM.focusDistanceGroup.style.display = focusDistanceCap && manualFocus ? 'flex' : 'none';
+      if (focusDistanceCap && manualFocus) {
+        DOM.focusDistanceSlider.min = focusDistanceCap.min;
+        DOM.focusDistanceSlider.max = focusDistanceCap.max;
+        DOM.focusDistanceSlider.step = focusDistanceCap.step || 0.01;
+        const focusDistance = settings.focusDistance ?? focusDistanceCap.min;
+        DOM.focusDistanceSlider.value = focusDistance;
+        DOM.focusDistanceValue.textContent = Number(focusDistance).toFixed(2);
+        visibleGroups.push(DOM.focusDistanceGroup);
+      }
+
+      const exposureModes = supportedExposureModes();
+      DOM.exposureGroup.style.display = exposureModes.length >= 2 ? 'flex' : 'none';
+      if (exposureModes.length >= 2) {
+        const mode = exposureModes.includes(settings.exposureMode) ? settings.exposureMode : exposureModes[0];
+        DOM.exposureBtn.textContent = mode === 'auto' ? '☀️ Auto' : '☀️ Manual';
+        visibleGroups.push(DOM.exposureGroup);
+      }
+
+      const exposureCompCap = rangeCapability(caps?.exposureCompensation);
+      const manualExposure = settings.exposureMode === 'manual';
+      DOM.exposureCompGroup.style.display = exposureCompCap && manualExposure ? 'flex' : 'none';
+      if (exposureCompCap && manualExposure) {
+        DOM.exposureCompSlider.min = exposureCompCap.min;
+        DOM.exposureCompSlider.max = exposureCompCap.max;
+        DOM.exposureCompSlider.step = exposureCompCap.step || 0.1;
+        const exposureCompensation = settings.exposureCompensation ?? exposureCompCap.min;
+        DOM.exposureCompSlider.value = exposureCompensation;
+        DOM.exposureCompValue.textContent = Number(exposureCompensation).toFixed(1);
+        visibleGroups.push(DOM.exposureCompGroup);
+      }
+
+      DOM.cameraControls.style.display = visibleGroups.length > 0 ? 'flex' : 'none';
+    };
+
+    const setupCameraControlListeners = () => {
+      DOM.zoomSlider.addEventListener('change', async () => {
+        const cap = rangeCapability(state.cameraCapabilities?.zoom);
+        if (!cap) return;
+        const ok = await applyCameraConstraint({ zoom: clampToCapability(Number(DOM.zoomSlider.value), cap) });
+        if (!ok) updateCameraControlsUI();
+      });
+
+      DOM.torchBtn.addEventListener('click', async () => {
+        const settings = getVideoTrack()?.getSettings() || {};
+        const ok = await applyCameraConstraint({ torch: settings.torch !== true });
+        if (!ok) updateCameraControlsUI();
+      });
+
+      DOM.focusBtn.addEventListener('click', async () => {
+        const modes = supportedFocusModes();
+        if (modes.length < 2) return;
+        const settings = getVideoTrack()?.getSettings() || {};
+        const current = modes.includes(settings.focusMode) ? settings.focusMode : modes[0];
+        const next = modes[(modes.indexOf(current) + 1) % modes.length];
+        const ok = await applyCameraConstraint({ focusMode: next });
+        if (!ok) updateCameraControlsUI();
+      });
+
+      DOM.focusDistanceSlider.addEventListener('change', async () => {
+        const cap = rangeCapability(state.cameraCapabilities?.focusDistance);
+        if (!cap) return;
+        const ok = await applyCameraConstraint({ focusDistance: clampToCapability(Number(DOM.focusDistanceSlider.value), cap) });
+        if (!ok) updateCameraControlsUI();
+      });
+
+      DOM.exposureBtn.addEventListener('click', async () => {
+        const modes = supportedExposureModes();
+        if (modes.length < 2) return;
+        const settings = getVideoTrack()?.getSettings() || {};
+        const current = modes.includes(settings.exposureMode) ? settings.exposureMode : modes[0];
+        const next = modes[(modes.indexOf(current) + 1) % modes.length];
+        const ok = await applyCameraConstraint({ exposureMode: next });
+        if (!ok) updateCameraControlsUI();
+      });
+
+      DOM.exposureCompSlider.addEventListener('change', async () => {
+        const cap = rangeCapability(state.cameraCapabilities?.exposureCompensation);
+        if (!cap) return;
+        const ok = await applyCameraConstraint({ exposureCompensation: clampToCapability(Number(DOM.exposureCompSlider.value), cap) });
+        if (!ok) updateCameraControlsUI();
+      });
+    };
+
+    // ============================================================================
     // Rendering & Texture Management
     // ============================================================================
 
@@ -807,6 +1071,8 @@ void main(void) {
         state.currentStream = stream;
         DOM.webcam.srcObject = stream;
 
+        detectCameraCapabilities();
+
         await updateVideoTexture();
 
         setStatus(`✅ ${nextCamera.label}`, CONFIG.DELAYS.STATUS_MESSAGE);
@@ -853,6 +1119,7 @@ void main(void) {
     const setupEventListeners = () => {
       DOM.captureBtn.addEventListener('click', capturePhoto);
       DOM.switchCameraBtn.addEventListener('click', switchCamera);
+      setupCameraControlListeners();
 
       state.resizeHandler = createResizeHandler();
 
@@ -896,6 +1163,8 @@ void main(void) {
         await DOM.webcam.play();
 
         await checkMultipleCameras();
+
+        detectCameraCapabilities();
 
         await initializePixiJS();
 
