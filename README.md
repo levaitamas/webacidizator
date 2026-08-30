@@ -8,20 +8,22 @@ We ([Kinga](@kingakov) and [Tamas](@levaitamas)) had a conceptual photo project 
 
 ## How It Works
 
-1. **Webcam Capture**: Requests browser webcam access (user-facing camera)
-2. **PixiJS Rendering**: Video frames rendered to WebGL canvas at 15 FPS (with default settings)
-3. **Filter Pipeline**:
+1. **Webcam Capture**: Requests browser webcam access once on load; lists available cameras via `enumerateDevices()` and shows a "Switch Camera" button when more than one is present
+2. **Camera Controls**: Exposes hardware controls the camera supports — zoom, torch (flash), focus mode/distance, and exposure mode/compensation — via the Camera Controls API; controls appear only when the device supports them
+3. **PixiJS Rendering**: Video frames rendered to WebGL canvas at 15 FPS (with default settings)
+4. **Filter Pipeline**:
    - Color matrix (removes green channel)
    - Animated noise filter
    - Custom pixel sort shader (vertical luminance-based sorting)
-4. **Dynamic Effects**: Parameters randomized every 60 frames for glitch aesthetic (with default settings)
-5. **Photo Export**: Capture current frame as PNG with timestamped filename
+5. **Dynamic Effects**: Parameters randomized every 60 frames for glitch aesthetic (with default settings)
+6. **Photo Export**: Capture current frame as PNG with timestamped filename
 
 ## Acknowledgments
 
 - **PixiJS**: Powerful 2D WebGL rendering engine
 - **Perplexity AI**: AI-powered research and development assistance
-- **Claude Sonnet 4.5**: Advanced AI model for code generation and debugging
+- **Claude Sonnet 4.5**: AI model for code generation and debugging
+- **Qwen 3.8 27B (FP8)**: AI model for code generation and debugging
 - Inspired by glitch art and pixel sorting techniques
 
 ## License
