@@ -1006,6 +1006,17 @@ void main(void) {
       };
     };
 
+    // Creates a fresh sprite backed by a texture of the current webcam frame,
+    // wired up with the shared filter pipeline. Used both on initial setup
+    // and whenever the video texture is recreated after a camera switch.
+    const createVideoSprite = () => {
+      const texture = Texture.from(DOM.webcam);
+      const sprite = new Sprite(texture);
+      sprite.anchor.set(0.5);
+      sprite.filters = [state.colorMatrix, state.noiseFilter, state.pixelSortFilter];
+      return { texture, sprite };
+    };
+
     const updateVideoTexture = async () => {
       try {
         DOM.webcam.pause();
@@ -1038,10 +1049,9 @@ void main(void) {
 
         await waitForVideoFrame(DOM.webcam);
 
-        state.texture = Texture.from(DOM.webcam);
-        state.sprite = new Sprite(state.texture);
-        state.sprite.anchor.set(0.5);
-        state.sprite.filters = [state.colorMatrix, state.noiseFilter, state.pixelSortFilter];
+        const { texture, sprite } = createVideoSprite();
+        state.texture = texture;
+        state.sprite = sprite;
         state.app.stage.addChild(state.sprite);
 
         if (state.resizeHandler) {
@@ -1141,10 +1151,9 @@ void main(void) {
     };
 
     const setupSprite = () => {
-      state.texture = Texture.from(DOM.webcam);
-      state.sprite = new Sprite(state.texture);
-      state.sprite.anchor.set(0.5);
-      state.sprite.filters = [state.colorMatrix, state.noiseFilter, state.pixelSortFilter];
+      const { texture, sprite } = createVideoSprite();
+      state.texture = texture;
+      state.sprite = sprite;
       state.app.stage.addChild(state.sprite);
     };
 
