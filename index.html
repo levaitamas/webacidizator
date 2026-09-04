@@ -751,7 +751,7 @@ void main(void) {
 
     const getCameraStream = async (deviceId = null) => {
       const constraints = {
-        video: deviceId ? { deviceId: { exact: deviceId } } : true,
+        video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: "environment" } },
         audio: false
       };
       return await navigator.mediaDevices.getUserMedia(constraints);
