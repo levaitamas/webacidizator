@@ -8,7 +8,7 @@ We ([Kinga](@kingakov) and [Tamas](@levaitamas)) had a conceptual photo project 
 
 ## How It Works
 
-1. **Webcam Capture**: Requests browser webcam access once on load; lists available cameras via `enumerateDevices()` and shows a "Switch Camera" button when more than one is present
+1. **Webcam Capture**: Requests browser webcam access once on load, preferring the world/rear-facing camera when available (falls back to any camera otherwise, so front-camera-only devices still work); lists available cameras via `enumerateDevices()` and shows a "Switch Camera" button when more than one is present, re-checked automatically whenever a camera is plugged or unplugged
 2. **Camera Controls**: Exposes hardware controls the camera supports — zoom, torch (flash), focus mode/distance, and exposure mode/compensation — via the Camera Controls API; controls appear only when the device supports them
 3. **PixiJS Rendering**: Video frames rendered to WebGL canvas at 15 FPS (with default settings)
 4. **Filter Pipeline**:
@@ -22,7 +22,7 @@ We ([Kinga](@kingakov) and [Tamas](@levaitamas)) had a conceptual photo project 
 
 - **PixiJS**: Powerful 2D WebGL rendering engine
 - **Perplexity AI**: AI-powered research and development assistance
-- **Claude Sonnet 4.5**: AI model for code generation and debugging
+- **Claude Sonnet 4.5 and 5**: AI model for code generation and debugging
 - **Qwen 3.8 27B (FP8)**: AI model for code generation and debugging
 - Inspired by glitch art and pixel sorting techniques
 
