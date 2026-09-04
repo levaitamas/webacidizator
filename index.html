@@ -1168,6 +1168,10 @@ void main(void) {
           state.texture.destroy(true);
         }
       });
+
+      // Re-scan for cameras when one is plugged/unplugged so the "Switch
+      // Camera" button reflects reality instead of only the startup snapshot.
+      navigator.mediaDevices.addEventListener('devicechange', checkMultipleCameras);
     };
 
     const setupAnimationLoop = () => {
