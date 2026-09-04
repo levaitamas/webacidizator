@@ -637,6 +637,10 @@ void main(void) {
       DOM.aboutModal.classList.add('active');
       document.body.style.overflow = 'hidden';
       DOM.closeModal.focus();
+      // The modal fully covers the canvas, so there's no point spending GPU
+      // time re-rendering the live glitch feed (and re-compositing it under
+      // the modal's backdrop-filter blur) while it's hidden.
+      state.app?.ticker.stop();
     };
 
     const closeModal = () => {
@@ -644,6 +648,7 @@ void main(void) {
       document.body.style.overflow = '';
       lastFocusedElement?.focus();
       lastFocusedElement = null;
+      state.app?.ticker.start();
     };
 
     // Close modal when clicking outside content
