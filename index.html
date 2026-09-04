@@ -665,6 +665,20 @@ void main(void) {
 
     const nextAnimationFrame = () => new Promise(resolve => requestAnimationFrame(resolve));
 
+    // Collapses bursts of calls (e.g. continuous window "resize" events)
+    // into at most one invocation per animation frame.
+    const rafThrottle = (fn) => {
+      let scheduled = false;
+      return (...args) => {
+        if (scheduled) return;
+        scheduled = true;
+        requestAnimationFrame(() => {
+          scheduled = false;
+          fn(...args);
+        });
+      };
+    };
+
     // Waits for an actual decoded video frame to be available, so the next
     // texture upload doesn't grab a stale/black frame right after a stream
     // swap. Falls back to a fixed delay on browsers without
@@ -1179,7 +1193,7 @@ void main(void) {
         DOM.webcam.addEventListener("loadedmetadata", state.resizeHandler, { once: true });
       }
 
-      window.addEventListener("resize", state.resizeHandler);
+      window.addEventListener("resize", rafThrottle(() => state.resizeHandler()));
       window.addEventListener('beforeunload', () => {
         stopStream();
         if (state.texture) {
