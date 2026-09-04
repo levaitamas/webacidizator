@@ -729,6 +729,11 @@ void main(void) {
       try {
         playFlashEffect();
 
+        // Without `preserveDrawingBuffer` the WebGL drawing buffer is cleared
+        // right after presenting, so force a fresh render immediately before
+        // reading pixels back via toBlob().
+        state.app.renderer.render(state.app.stage);
+
         state.app.canvas.toBlob((blob) => {
           try {
             if (!blob) {
@@ -1137,8 +1142,7 @@ void main(void) {
       await state.app.init({
         resizeTo: DOM.container,
         backgroundAlpha: 0,
-        antialias: true,
-        preserveDrawingBuffer: true
+        antialias: true
       });
       state.app.ticker.maxFPS = CONFIG.FPS;
       DOM.container.replaceChildren(state.app.canvas);
