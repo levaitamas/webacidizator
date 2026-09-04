@@ -1016,6 +1016,11 @@ void main(void) {
     // and whenever the video texture is recreated after a camera switch.
     const createVideoSprite = () => {
       const texture = Texture.from(DOM.webcam);
+      // The render loop already uploads a fresh video frame every tick (see
+      // setupAnimationLoop), capped to CONFIG.FPS. Pixi's own autoUpdate
+      // would otherwise *also* upload a new frame on every real video frame
+      // (via requestVideoFrameCallback), duplicating that work.
+      texture.source.autoUpdate = false;
       const sprite = new Sprite(texture);
       sprite.anchor.set(0.5);
       sprite.filters = [state.colorMatrix, state.noiseFilter, state.pixelSortFilter];
