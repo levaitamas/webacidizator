@@ -1046,13 +1046,16 @@ void main(void) {
     };
 
     const switchCamera = async () => {
+      const previousIndex = state.currentCameraIndex;
+      const nextIndex = (previousIndex + 1) % state.availableCameras.length;
+      const nextCamera = state.availableCameras[nextIndex];
+
       try {
         DOM.switchCameraBtn.disabled = true;
         DOM.captureBtn.disabled = true;
         setStatus('🔄 Switching camera...');
 
-        state.currentCameraIndex = (state.currentCameraIndex + 1) % state.availableCameras.length;
-        const nextCamera = state.availableCameras[state.currentCameraIndex];
+        state.currentCameraIndex = nextIndex;
 
         stopStream();
 
@@ -1069,9 +1072,35 @@ void main(void) {
         console.error("Camera switch failed:", error);
         const message = ERROR_MESSAGES[error.name] || "Camera switch failed";
         setStatus(`❌ ${message}`, CONFIG.DELAYS.ERROR_MESSAGE);
+        await recoverPreviousCamera(previousIndex);
       } finally {
         DOM.switchCameraBtn.disabled = false;
         DOM.captureBtn.disabled = false;
+      }
+    };
+
+    // If acquiring the next camera's stream failed, `stopStream()` already
+    // released the old tracks, leaving `DOM.webcam.srcObject` pointing at a
+    // dead stream (frozen frame, no recovery). Try to reopen the previous
+    // camera so the app doesn't end up in a broken, unrecoverable state.
+    const recoverPreviousCamera = async (previousIndex) => {
+      if (state.currentStream) return;
+
+      const previousCamera = state.availableCameras[previousIndex];
+      if (!previousCamera) return;
+
+      try {
+        const stream = await getCameraStream(previousCamera.deviceId);
+        state.currentStream = stream;
+        DOM.webcam.srcObject = stream;
+        state.currentCameraIndex = previousIndex;
+
+        detectCameraCapabilities();
+        await updateVideoTexture();
+      } catch (error) {
+        console.error("Failed to restore previous camera:", error);
+        DOM.webcam.srcObject = null;
+        showError("Camera connection lost. Please refresh the page.");
       }
     };
 
