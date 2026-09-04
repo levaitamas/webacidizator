@@ -716,21 +716,26 @@ void main(void) {
         playFlashEffect();
 
         state.app.canvas.toBlob((blob) => {
-          if (!blob) {
-            setStatus('❌ Failed to capture image');
-            return;
+          try {
+            if (!blob) {
+              setStatus('❌ Failed to capture image');
+              return;
+            }
+
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+
+            link.download = `webacidizator-${timestamp}.png`;
+            link.href = url;
+            link.click();
+
+            setTimeout(() => URL.revokeObjectURL(url), CONFIG.DELAYS.URL_REVOKE);
+            setStatus('✅ Photo saved!', CONFIG.DELAYS.ERROR_MESSAGE);
+          } catch (error) {
+            console.error('Capture failed:', error);
+            setStatus('❌ Capture failed', CONFIG.DELAYS.ERROR_MESSAGE);
           }
-
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-
-          link.download = `webacidizator-${timestamp}.png`;
-          link.href = url;
-          link.click();
-
-          setTimeout(() => URL.revokeObjectURL(url), CONFIG.DELAYS.URL_REVOKE);
-          setStatus('✅ Photo saved!', CONFIG.DELAYS.ERROR_MESSAGE);
         }, 'image/png');
       } catch (error) {
         console.error('Capture failed:', error);
