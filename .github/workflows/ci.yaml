@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Validate HTML
-        run: npx --yes html-validate@10.17.0 index.html
+        run: npx --yes html-validate@11.16.2 index.html
 
       - name: Syntax-check inline JS
         run: node scripts/check-inline-js.mjs
