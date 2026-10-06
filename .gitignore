@@ -1,3 +1,7 @@
 # editor
 *~
 \#*\#
+
+# local smoke test dependencies and artifacts
+node_modules/
+test-results/

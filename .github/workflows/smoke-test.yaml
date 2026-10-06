@@ -1,0 +1,47 @@
+name: Smoke Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - index.html
+  pull_request:
+    paths:
+      - index.html
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-1.63.0
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright
+        run: npm install --no-save --no-package-lock playwright@1.63.0
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run smoke test
+        run: node scripts/runtime-check.mjs
+
+      - name: Upload screenshot
+        if: always() && hashFiles('test-results/smoke.png') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: smoke-screenshot
+          path: test-results/smoke.png
