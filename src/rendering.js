@@ -133,8 +133,11 @@ export const switchCamera = async () => {
     setStatus(`❌ ${message}`, CONFIG.DELAYS.ERROR_MESSAGE);
     await recoverPreviousCamera(previousIndex);
   } finally {
-    DOM.switchCameraBtn.disabled = false;
-    DOM.captureBtn.disabled = false;
+    // Leave the buttons disabled if the camera could not be recovered.
+    if (state.currentStream) {
+      DOM.switchCameraBtn.disabled = false;
+      DOM.captureBtn.disabled = false;
+    }
   }
 };
 
@@ -158,7 +161,18 @@ const recoverPreviousCamera = async (previousIndex) => {
     await updateVideoTexture();
   } catch (error) {
     console.error("Failed to restore previous camera:", error);
-    DOM.webcam.srcObject = null;
-    showError("Camera connection lost. Please refresh the page.");
+    showCameraLost();
   }
+};
+
+// Terminal state: no usable stream. Stop rendering into the (soon
+// detached) canvas and keep the camera-dependent buttons disabled so
+// e.g. capturing can't download a blank frame.
+export const showCameraLost = () => {
+  stopStream();
+  DOM.webcam.srcObject = null;
+  state.app?.ticker.stop();
+  DOM.captureBtn.disabled = true;
+  DOM.switchCameraBtn.disabled = true;
+  showError("Camera connection lost. Please refresh the page.");
 };

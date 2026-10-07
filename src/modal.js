@@ -43,7 +43,8 @@ const closeModal = () => {
   document.body.style.overflow = '';
   lastFocusedElement?.focus();
   lastFocusedElement = null;
-  state.app?.ticker.start();
+  // Don't resume rendering if the camera was lost meanwhile.
+  if (state.currentStream) state.app?.ticker.start();
 };
 
 // Close modal when clicking outside content
