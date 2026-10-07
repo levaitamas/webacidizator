@@ -8,7 +8,7 @@ We ([Kinga](@kingakov) and [Tamas](@levaitamas)) had a conceptual photo project 
 
 ## How It Works
 
-1. **Webcam Capture**: Requests browser webcam access once on load, preferring the world/rear-facing camera when available (falls back to any camera otherwise, so front-camera-only devices still work); lists available cameras via `enumerateDevices()` and shows a "Switch Camera" button when more than one is present, re-checked automatically whenever a camera is plugged or unplugged
+1. **Webcam Capture**: Requests browser webcam access once on load, preferring the world/rear-facing camera when available (falls back to any camera otherwise, so front-camera-only devices still work); lists available cameras via `enumerateDevices()` and shows a "Switch Camera" button when more than one is present, re-checked automatically whenever a camera is plugged or unplugged; if the active camera disconnects, falls back to another one
 2. **Camera Controls**: Exposes hardware controls the camera supports — zoom, torch (flash), focus mode/distance, and exposure mode/compensation — via the Camera Controls API; controls appear only when the device supports them
 3. **PixiJS Rendering**: Video frames rendered to WebGL canvas at 15 FPS (with default settings)
 4. **Glitch Filter** (a single custom shader pass):
@@ -47,7 +47,7 @@ No build step — the app runs as native ES modules in the browser and is deploy
 
 - **PixiJS**: Powerful 2D WebGL rendering engine
 - **Perplexity AI**: AI-powered research and development assistance
-- **Claude Sonnet 4.5 and 5**: AI model for code generation and debugging
+- **Claude Sonnet 4.5 and 5, Claude Opus 5.5**: AI models for code generation and debugging
 - **Qwen 3.8 27B (FP8)**: AI model for code generation and debugging
 - **LongCat 2.5**: AI model for code generation and debugging
 - Inspired by glitch art and pixel sorting techniques
