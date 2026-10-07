@@ -48,7 +48,7 @@ export const createVideoSprite = () => {
   texture.source.autoUpdate = false;
   const sprite = new Sprite(texture);
   sprite.anchor.set(0.5);
-  sprite.filters = [state.colorMatrix, state.noiseFilter, state.pixelSortFilter];
+  sprite.filters = [state.glitchFilter];
   return { texture, sprite };
 };
 

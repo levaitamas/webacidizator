@@ -3,7 +3,6 @@
 // ============================================================================
 
 import {
-  ColorMatrixFilter,
   Filter,
   GlProgram
 } from "https://cdn.jsdelivr.net/npm/pixi.js@8.22.0/dist/pixi.min.mjs";
@@ -12,18 +11,10 @@ import { CONFIG } from "./config.js";
 import { SHADERS } from "./shaders.js";
 import { randomInRange } from "./utils.js";
 
-export const createColorMatrix = () => {
-  const filter = new ColorMatrixFilter();
-  filter.matrix = [
-    1, 0, 0, 0, 0,
-    0, 0, 0, 0, 0,
-    0, 0, 1, 0, 0,
-    0, 0, 0, 1, 0
-  ];
-  return filter;
-};
-
-export const createPixelSortFilter = () => {
+// Single-pass glitch filter: drops the green channel, adds animated
+// noise, and pixel-sorts the result (see SHADERS.fragment). Doing it in
+// one pass avoids two full-screen render-to-texture round trips.
+export const createGlitchFilter = () => {
   return new Filter({
     glProgram: new GlProgram({
       fragment: SHADERS.fragment,
@@ -34,9 +25,16 @@ export const createPixelSortFilter = () => {
         uMinThreshold: { value: 0.2, type: 'f32' },
         uMaxThreshold: { value: 0.7, type: 'f32' },
         uSpread: { value: 30.0, type: 'f32' },
+        uNoise: { value: CONFIG.NOISE_AMOUNT, type: 'f32' },
+        uSeed: { value: Math.random(), type: 'f32' },
       }
     },
   });
+};
+
+export const randomizeNoiseSeed = (filter) => {
+  const uniforms = filter?.resources?.pixelSortUniforms?.uniforms;
+  if (uniforms) uniforms.uSeed = Math.random();
 };
 
 export const randomizePixelSortParams = (filter) => {

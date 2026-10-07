@@ -3,15 +3,14 @@
 // ============================================================================
 
 import {
-  Application,
-  NoiseFilter
+  Application
 } from "https://cdn.jsdelivr.net/npm/pixi.js@8.22.0/dist/pixi.min.mjs";
 
 import { CONFIG, STARTUP_ERROR_MESSAGES } from "./config.js";
 import { DOM } from "./dom.js";
 import { state } from "./state.js";
 import { rafThrottle, showError } from "./utils.js";
-import { createColorMatrix, createPixelSortFilter, randomizePixelSortParams } from "./filters.js";
+import { createGlitchFilter, randomizeNoiseSeed, randomizePixelSortParams } from "./filters.js";
 import { capturePhoto } from "./capture.js";
 import { checkMultipleCameras, getCameraStream, stopStream } from "./camera.js";
 import { detectCameraCapabilities, setupCameraControlListeners } from "./camera-controls.js";
@@ -30,9 +29,7 @@ const initializePixiJS = async () => {
 };
 
 const createFilters = () => {
-  state.colorMatrix = createColorMatrix();
-  state.noiseFilter = new NoiseFilter({ noise: CONFIG.NOISE_AMOUNT });
-  state.pixelSortFilter = createPixelSortFilter();
+  state.glitchFilter = createGlitchFilter();
 };
 
 const setupSprite = () => {
@@ -81,11 +78,11 @@ const setupAnimationLoop = () => {
       state.texture.source.update();
     }
 
-    state.noiseFilter.seed = Math.random();
+    randomizeNoiseSeed(state.glitchFilter);
 
     frameCount++;
     if (frameCount % CONFIG.PARAM_CHANGE_INTERVAL === 0) {
-      randomizePixelSortParams(state.pixelSortFilter);
+      randomizePixelSortParams(state.glitchFilter);
     }
   });
 };

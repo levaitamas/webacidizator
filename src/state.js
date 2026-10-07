@@ -9,9 +9,7 @@ export const state = {
   app: null,
   sprite: null,
   texture: null,
-  colorMatrix: null,
-  noiseFilter: null,
-  pixelSortFilter: null,
+  glitchFilter: null,
   resizeHandler: null,
   cameraCapabilities: null
 };

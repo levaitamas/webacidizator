@@ -11,10 +11,10 @@ We ([Kinga](@kingakov) and [Tamas](@levaitamas)) had a conceptual photo project 
 1. **Webcam Capture**: Requests browser webcam access once on load, preferring the world/rear-facing camera when available (falls back to any camera otherwise, so front-camera-only devices still work); lists available cameras via `enumerateDevices()` and shows a "Switch Camera" button when more than one is present, re-checked automatically whenever a camera is plugged or unplugged
 2. **Camera Controls**: Exposes hardware controls the camera supports — zoom, torch (flash), focus mode/distance, and exposure mode/compensation — via the Camera Controls API; controls appear only when the device supports them
 3. **PixiJS Rendering**: Video frames rendered to WebGL canvas at 15 FPS (with default settings)
-4. **Filter Pipeline**:
-   - Color matrix (removes green channel)
-   - Animated noise filter
-   - Custom pixel sort shader (vertical luminance-based sorting)
+4. **Glitch Filter** (a single custom shader pass):
+   - Color stage (removes green channel)
+   - Animated noise
+   - Pixel sort (vertical luminance-based sorting)
 5. **Dynamic Effects**: Parameters randomized every 60 frames for glitch aesthetic (with default settings)
 6. **Photo Export**: Capture current frame as PNG with timestamped filename
 
@@ -25,7 +25,7 @@ index.html          Entry point (markup only)
 src/
   main.js           App initialization and entry point
   config.js         Constants and error messages
-  shaders.js        GLSL shaders for the pixel sort filter
+  shaders.js        GLSL shaders for the glitch filter
   dom.js            DOM element references
   state.js          Shared application state
   utils.js          Shared helpers (status, timing, throttling)
