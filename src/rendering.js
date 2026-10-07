@@ -122,17 +122,17 @@ export const attachStream = (stream) => {
   }, { once: true });
 };
 
-// Falls back to any other available camera, or to the camera lost
-// state if there is none.
-const handleCameraEnded = async () => {
-  console.warn('Active camera ended, trying another one');
+// Opens a camera as the new feed (the given device, or by default any
+// camera, preferring the rear one), or enters the camera lost state if
+// none can be opened. Resolves to whether a camera is running again.
+export const reopenCamera = async (deviceId = null) => {
   DOM.switchCameraBtn.disabled = true;
   DOM.captureBtn.disabled = true;
   stopStream();
 
   try {
-    attachStream(await getCameraStream());
-    if (!state.app) return; // still starting up; start() takes it from here
+    attachStream(await getCameraStream(deviceId));
+    if (!state.app) return false; // still starting up; start() takes it from here
 
     detectCameraCapabilities();
     await updateVideoTexture();
@@ -140,10 +140,18 @@ const handleCameraEnded = async () => {
 
     DOM.switchCameraBtn.disabled = false;
     DOM.captureBtn.disabled = false;
-    setStatus('⚠️ Camera disconnected, switched to another one', CONFIG.DELAYS.ERROR_MESSAGE);
+    return true;
   } catch (error) {
-    console.error('No camera available after disconnect:', error);
+    console.error('Failed to reopen camera:', error);
     showCameraLost();
+    return false;
+  }
+};
+
+const handleCameraEnded = async () => {
+  console.warn('Active camera ended, trying another one');
+  if (await reopenCamera()) {
+    setStatus('⚠️ Camera disconnected, switched to another one', CONFIG.DELAYS.ERROR_MESSAGE);
   }
 };
 
