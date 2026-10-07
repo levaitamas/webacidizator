@@ -4,7 +4,7 @@
 // "type": "module", so `node --check file.js` would parse them as
 // CommonJS and reject import/export syntax. As the old inline-JS check
 // did, each file is copied to a temp .mjs before checking.
-import { readdirSync, readFileSync, writeFileSync, mkdtempSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,4 +24,5 @@ for (const file of files) {
   writeFileSync(target, readFileSync(join(srcDir, file), "utf8"));
   execFileSync(process.execPath, ["--check", target], { stdio: "inherit" });
 }
+rmSync(dir, { recursive: true, force: true });
 console.log(`Syntax OK: ${files.length} modules in src/`);

@@ -8,10 +8,12 @@ on:
     paths:
       - index.html
       - src/**
+      - scripts/**
   pull_request:
     paths:
       - index.html
       - src/**
+      - scripts/**
 
 permissions:
   contents: read
