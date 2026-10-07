@@ -142,6 +142,11 @@ const handleCameraEnded = async () => {
 };
 
 export const switchCamera = async () => {
+  // The camera list can shrink (devicechange) while the button is shown;
+  // with no other camera there is nothing to switch to, and an empty
+  // list would make the index below NaN.
+  if (state.availableCameras.length < 2) return;
+
   const previousIndex = state.currentCameraIndex;
   const nextIndex = (previousIndex + 1) % state.availableCameras.length;
   const nextCamera = state.availableCameras[nextIndex];
