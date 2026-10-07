@@ -28,8 +28,13 @@ body {
 }
 
 #app {
-  width: min(90vmin, 900px);
-  height: min(90vmin, 900px);
+  /* Leave room below the square canvas for the buttons and status line,
+     so they fit on landscape screens without scrolling (dvh accounts for
+     mobile browser toolbars; plain vh is the fallback). */
+  width: min(90vmin, 900px, max(12rem, 100vh - 8rem));
+  width: min(90vmin, 900px, max(12rem, 100dvh - 8rem));
+  height: min(90vmin, 900px, max(12rem, 100vh - 8rem));
+  height: min(90vmin, 900px, max(12rem, 100dvh - 8rem));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -302,15 +307,6 @@ button.compact.active {
 
 .modal-body a:hover {
   color: #8b5cf6;
-}
-
-.modal-footer {
-  margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  text-align: center;
-  color: #64748b;
-  font-size: 0.875rem;
 }
 
 /* Scrollbar styling */
