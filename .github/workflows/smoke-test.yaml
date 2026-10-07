@@ -7,9 +7,11 @@ on:
       - main
     paths:
       - index.html
+      - src/**
   pull_request:
     paths:
       - index.html
+      - src/**
 
 permissions:
   contents: read

@@ -20,5 +20,5 @@ jobs:
       - name: Validate HTML
         run: npx --yes html-validate@11.16.2 index.html
 
-      - name: Syntax-check inline JS
-        run: node scripts/check-inline-js.mjs
+      - name: Syntax-check app modules
+        run: node scripts/check-app-js.mjs
