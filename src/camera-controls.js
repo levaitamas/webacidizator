@@ -30,7 +30,14 @@ const applyCameraConstraint = async (constraints) => {
   const track = getVideoTrack();
   if (!track?.applyConstraints) return false;
   try {
-    await track.applyConstraints(constraints);
+    // applyConstraints() replaces the whole constraint set, so merge with
+    // what is already applied; otherwise changing e.g. zoom would reset
+    // torch or focus mode and drop the original deviceId/facingMode.
+    const current = track.getConstraints?.() || {};
+    await track.applyConstraints({
+      ...current,
+      advanced: [{ ...current.advanced?.[0], ...constraints }]
+    });
     updateCameraControlsUI();
     return true;
   } catch (error) {
