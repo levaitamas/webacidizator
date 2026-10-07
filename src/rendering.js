@@ -11,7 +11,7 @@ import { CONFIG, ERROR_MESSAGES } from "./config.js";
 import { DOM } from "./dom.js";
 import { state } from "./state.js";
 import { nextAnimationFrame, setStatus, showError, waitForVideoFrame } from "./utils.js";
-import { getCameraStream, stopStream } from "./camera.js";
+import { checkMultipleCameras, getCameraStream, stopStream } from "./camera.js";
 import { detectCameraCapabilities } from "./camera-controls.js";
 
 export const createResizeHandler = () => {
@@ -104,6 +104,43 @@ const updateVideoTexture = async () => {
   }
 };
 
+// Makes `stream` the active camera feed and watches its video track for
+// the camera going away (unplugged, permission revoked, taken over by
+// the OS), which would otherwise silently freeze the feed. Tracks we
+// stop ourselves via stopStream() don't fire "ended".
+export const attachStream = (stream) => {
+  state.currentStream = stream;
+  DOM.webcam.srcObject = stream;
+  stream.getVideoTracks()[0]?.addEventListener('ended', () => {
+    if (state.currentStream === stream) handleCameraEnded();
+  }, { once: true });
+};
+
+// Falls back to any other available camera, or to the camera lost
+// state if there is none.
+const handleCameraEnded = async () => {
+  console.warn('Active camera ended, trying another one');
+  DOM.switchCameraBtn.disabled = true;
+  DOM.captureBtn.disabled = true;
+  stopStream();
+
+  try {
+    attachStream(await getCameraStream());
+    if (!state.app) return; // still starting up; start() takes it from here
+
+    detectCameraCapabilities();
+    await updateVideoTexture();
+    await checkMultipleCameras();
+
+    DOM.switchCameraBtn.disabled = false;
+    DOM.captureBtn.disabled = false;
+    setStatus('⚠️ Camera disconnected, switched to another one', CONFIG.DELAYS.ERROR_MESSAGE);
+  } catch (error) {
+    console.error('No camera available after disconnect:', error);
+    showCameraLost();
+  }
+};
+
 export const switchCamera = async () => {
   const previousIndex = state.currentCameraIndex;
   const nextIndex = (previousIndex + 1) % state.availableCameras.length;
@@ -118,9 +155,7 @@ export const switchCamera = async () => {
 
     stopStream();
 
-    const stream = await getCameraStream(nextCamera.deviceId);
-    state.currentStream = stream;
-    DOM.webcam.srcObject = stream;
+    attachStream(await getCameraStream(nextCamera.deviceId));
 
     detectCameraCapabilities();
 
@@ -152,9 +187,7 @@ const recoverPreviousCamera = async (previousIndex) => {
   if (!previousCamera) return;
 
   try {
-    const stream = await getCameraStream(previousCamera.deviceId);
-    state.currentStream = stream;
-    DOM.webcam.srcObject = stream;
+    attachStream(await getCameraStream(previousCamera.deviceId));
     state.currentCameraIndex = previousIndex;
 
     detectCameraCapabilities();

@@ -15,7 +15,7 @@ import { createColorMatrix, createPixelSortFilter, randomizePixelSortParams } fr
 import { capturePhoto } from "./capture.js";
 import { checkMultipleCameras, getCameraStream, stopStream } from "./camera.js";
 import { detectCameraCapabilities, setupCameraControlListeners } from "./camera-controls.js";
-import { createResizeHandler, createVideoSprite, switchCamera } from "./rendering.js";
+import { attachStream, createResizeHandler, createVideoSprite, switchCamera } from "./rendering.js";
 import "./modal.js";
 
 const initializePixiJS = async () => {
@@ -87,9 +87,7 @@ const setupAnimationLoop = () => {
 
 const start = async () => {
   try {
-    const stream = await getCameraStream();
-    state.currentStream = stream;
-    DOM.webcam.srcObject = stream;
+    attachStream(await getCameraStream());
     await DOM.webcam.play();
 
     await checkMultipleCameras();
