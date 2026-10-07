@@ -52,6 +52,12 @@ export const createVideoSprite = () => {
   return { texture, sprite };
 };
 
+// The About modal pauses rendering while it covers the canvas (see
+// modal.js), so only restart the ticker when it isn't open.
+const resumeRendering = () => {
+  if (!DOM.aboutModal.classList.contains('active')) state.app.ticker.start();
+};
+
 const updateVideoTexture = async () => {
   try {
     DOM.webcam.pause();
@@ -94,11 +100,11 @@ const updateVideoTexture = async () => {
     }
 
     state.app.renderer.render(state.app.stage);
-    state.app.ticker.start();
+    resumeRendering();
   } catch (error) {
     console.error('Failed to update video texture:', error);
     if (state.app?.ticker) {
-      state.app.ticker.start();
+      resumeRendering();
     }
     throw error;
   }
