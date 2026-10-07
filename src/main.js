@@ -22,7 +22,9 @@ const initializePixiJS = async () => {
   await state.app.init({
     resizeTo: DOM.container,
     backgroundAlpha: 0,
-    antialias: true
+    // The stage is a single full-canvas sprite, so multisampling has no
+    // edges to smooth and would only cost GPU time and memory.
+    antialias: false
   });
   state.app.ticker.maxFPS = CONFIG.FPS;
   DOM.container.replaceChildren(state.app.canvas);
