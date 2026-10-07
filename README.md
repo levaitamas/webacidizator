@@ -18,12 +18,38 @@ We ([Kinga](@kingakov) and [Tamas](@levaitamas)) had a conceptual photo project 
 5. **Dynamic Effects**: Parameters randomized every 60 frames for glitch aesthetic (with default settings)
 6. **Photo Export**: Capture current frame as PNG with timestamped filename
 
+## Project Structure
+
+```
+index.html          Entry point (markup only)
+src/
+  main.js           App initialization and entry point
+  config.js         Constants and error messages
+  shaders.js        GLSL shaders for the pixel sort filter
+  dom.js            DOM element references
+  state.js          Shared application state
+  utils.js          Shared helpers (status, timing, throttling)
+  modal.js          About modal behavior
+  filters.js        PixiJS filter creation
+  capture.js        Photo capture and download
+  camera.js         Camera stream management
+  camera-controls.js  Hardware camera controls (zoom, torch, focus, exposure)
+  rendering.js      PixiJS rendering, textures, camera switching
+  styles.css        All styles
+scripts/
+  check-app-js.mjs  Syntax-checks all src/*.js modules
+  runtime-check.mjs Playwright smoke test (headless Chromium + fake camera)
+```
+
+No build step — the app runs as native ES modules in the browser and is deployed statically to GitHub Pages.
+
 ## Acknowledgments
 
 - **PixiJS**: Powerful 2D WebGL rendering engine
 - **Perplexity AI**: AI-powered research and development assistance
 - **Claude Sonnet 4.5 and 5**: AI model for code generation and debugging
 - **Qwen 3.8 27B (FP8)**: AI model for code generation and debugging
+- **LongCat 2.5**: AI model for code generation and debugging
 - Inspired by glitch art and pixel sorting techniques
 
 ## License
