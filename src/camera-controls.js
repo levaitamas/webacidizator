@@ -103,14 +103,16 @@ const updateCameraControlsUI = () => {
   DOM.exposureGroup.style.display = exposureModes.length >= 2 ? 'flex' : 'none';
   if (exposureModes.length >= 2) {
     const mode = exposureModes.includes(settings.exposureMode) ? settings.exposureMode : exposureModes[0];
-    DOM.exposureBtn.textContent = mode === 'auto' ? '☀️ Auto' : '☀️ Manual';
+    DOM.exposureBtn.textContent = mode === 'manual' ? '☀️ Manual' : '☀️ Auto';
     visibleGroups.push(DOM.exposureGroup);
   }
 
+  // Exposure compensation biases the automatic exposure, so it only
+  // has an effect while exposure is not under manual control.
   const exposureCompCap = rangeCapability(caps?.exposureCompensation);
-  const manualExposure = settings.exposureMode === 'manual';
-  DOM.exposureCompGroup.style.display = exposureCompCap && manualExposure ? 'flex' : 'none';
-  if (exposureCompCap && manualExposure) {
+  const autoExposure = settings.exposureMode !== 'manual';
+  DOM.exposureCompGroup.style.display = exposureCompCap && autoExposure ? 'flex' : 'none';
+  if (exposureCompCap && autoExposure) {
     DOM.exposureCompSlider.min = exposureCompCap.min;
     DOM.exposureCompSlider.max = exposureCompCap.max;
     DOM.exposureCompSlider.step = exposureCompCap.step || 0.1;

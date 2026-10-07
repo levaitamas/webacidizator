@@ -36,5 +36,6 @@ export const STARTUP_ERROR_MESSAGES = {
   NotReadableError: "Camera is already in use by another application."
 };
 
-export const FOCUS_MODE_ORDER = ["continuous", "single", "manual"];
-export const EXPOSURE_MODE_ORDER = ["auto", "manual"];
+// MeteringMode values from the MediaStream Image Capture spec.
+export const FOCUS_MODE_ORDER = ["continuous", "single-shot", "manual"];
+export const EXPOSURE_MODE_ORDER = ["continuous", "manual"];
