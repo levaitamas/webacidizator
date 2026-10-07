@@ -40,10 +40,13 @@ export const createPixelSortFilter = () => {
 };
 
 export const randomizePixelSortParams = (filter) => {
-  if (!filter?.uniforms) return;
+  // Pixi v8 filters have no `uniforms` shortcut; the values live on the
+  // uniform group passed in `resources`.
+  const uniforms = filter?.resources?.pixelSortUniforms?.uniforms;
+  if (!uniforms) return;
 
   const { MIN_THRESHOLD_RANGE, MAX_THRESHOLD_RANGE, SPREAD_RANGE } = CONFIG.PIXEL_SORT;
-  filter.uniforms.uMinThreshold = randomInRange(...MIN_THRESHOLD_RANGE);
-  filter.uniforms.uMaxThreshold = randomInRange(...MAX_THRESHOLD_RANGE);
-  filter.uniforms.uSpread = randomInRange(...SPREAD_RANGE);
+  uniforms.uMinThreshold = randomInRange(...MIN_THRESHOLD_RANGE);
+  uniforms.uMaxThreshold = randomInRange(...MAX_THRESHOLD_RANGE);
+  uniforms.uSpread = randomInRange(...SPREAD_RANGE);
 };
