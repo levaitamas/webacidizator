@@ -16,10 +16,15 @@ export const showError = (message) => {
 
 export const randomInRange = (min, max) => min + Math.random() * (max - min);
 
+let statusTimer = null;
+
 export const setStatus = (message, duration = 0) => {
+  // Cancel the previous message's auto-clear so it can't wipe this one.
+  clearTimeout(statusTimer);
+  statusTimer = null;
   DOM.status.textContent = message;
   if (duration > 0) {
-    setTimeout(() => { DOM.status.textContent = ''; }, duration);
+    statusTimer = setTimeout(() => { DOM.status.textContent = ''; }, duration);
   }
 };
 
