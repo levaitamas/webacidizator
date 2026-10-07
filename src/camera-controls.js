@@ -20,6 +20,11 @@ const clampToCapability = (value, cap) => {
 const rangeCapability = (cap) =>
   cap && typeof cap === 'object' && cap.min < cap.max ? cap : null;
 
+const formatZoom = (zoom) =>
+  `${Number(zoom) % 1 === 0 ? Number(zoom).toFixed(1) : Number(zoom).toFixed(2)}×`;
+const formatFocusDistance = (distance) => Number(distance).toFixed(2);
+const formatExposureComp = (compensation) => Number(compensation).toFixed(1);
+
 const supportedFocusModes = () =>
   FOCUS_MODE_ORDER.filter(mode => state.cameraCapabilities?.focusMode?.includes(mode));
 
@@ -71,7 +76,7 @@ const updateCameraControlsUI = () => {
     DOM.zoomSlider.step = zoomCap.step || 0.1;
     const zoom = settings.zoom ?? zoomCap.min;
     DOM.zoomSlider.value = zoom;
-    DOM.zoomValue.textContent = `${Number(zoom) % 1 === 0 ? Number(zoom).toFixed(1) : Number(zoom).toFixed(2)}×`;
+    DOM.zoomValue.textContent = formatZoom(zoom);
     visibleGroups.push(DOM.zoomGroup);
   }
 
@@ -102,7 +107,7 @@ const updateCameraControlsUI = () => {
     DOM.focusDistanceSlider.step = focusDistanceCap.step || 0.01;
     const focusDistance = settings.focusDistance ?? focusDistanceCap.min;
     DOM.focusDistanceSlider.value = focusDistance;
-    DOM.focusDistanceValue.textContent = Number(focusDistance).toFixed(2);
+    DOM.focusDistanceValue.textContent = formatFocusDistance(focusDistance);
     visibleGroups.push(DOM.focusDistanceGroup);
   }
 
@@ -125,7 +130,7 @@ const updateCameraControlsUI = () => {
     DOM.exposureCompSlider.step = exposureCompCap.step || 0.1;
     const exposureCompensation = settings.exposureCompensation ?? exposureCompCap.min;
     DOM.exposureCompSlider.value = exposureCompensation;
-    DOM.exposureCompValue.textContent = Number(exposureCompensation).toFixed(1);
+    DOM.exposureCompValue.textContent = formatExposureComp(exposureCompensation);
     visibleGroups.push(DOM.exposureCompGroup);
   }
 
@@ -133,6 +138,18 @@ const updateCameraControlsUI = () => {
 };
 
 export const setupCameraControlListeners = () => {
+  // Constraints are applied on "change" (release); meanwhile keep the
+  // value labels in sync with the slider while it is being dragged.
+  DOM.zoomSlider.addEventListener('input', () => {
+    DOM.zoomValue.textContent = formatZoom(DOM.zoomSlider.value);
+  });
+  DOM.focusDistanceSlider.addEventListener('input', () => {
+    DOM.focusDistanceValue.textContent = formatFocusDistance(DOM.focusDistanceSlider.value);
+  });
+  DOM.exposureCompSlider.addEventListener('input', () => {
+    DOM.exposureCompValue.textContent = formatExposureComp(DOM.exposureCompSlider.value);
+  });
+
   DOM.zoomSlider.addEventListener('change', async () => {
     const cap = rangeCapability(state.cameraCapabilities?.zoom);
     if (!cap) return;
