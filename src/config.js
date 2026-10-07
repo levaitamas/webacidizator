@@ -19,7 +19,9 @@ export const CONFIG = {
     FLASH_DURATION: 100,
     STATUS_MESSAGE: 2000,
     ERROR_MESSAGE: 3000,
-    URL_REVOKE: 100
+    // Some browsers (notably Safari and Firefox) start the download
+    // asynchronously, so revoking the blob URL too early can break it.
+    URL_REVOKE: 40000
   }
 };
 
