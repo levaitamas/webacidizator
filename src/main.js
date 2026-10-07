@@ -91,14 +91,19 @@ const setupAnimationLoop = () => {
 
 const start = async () => {
   try {
-    attachStream(await getCameraStream());
+    // Set up WebGL while the user is still answering the camera prompt.
+    // Wait for both, so a quick camera failure can't have its error
+    // message replaced by the canvas mounted afterwards.
+    const [camera, pixi] = await Promise.allSettled([getCameraStream(), initializePixiJS()]);
+    if (camera.status === 'rejected') throw camera.reason;
+    attachStream(camera.value);
+    if (pixi.status === 'rejected') throw pixi.reason;
+
     await DOM.webcam.play();
 
     await checkMultipleCameras();
 
     detectCameraCapabilities();
-
-    await initializePixiJS();
 
     createFilters();
     setupSprite();
@@ -111,6 +116,8 @@ const start = async () => {
     setupAnimationLoop();
   } catch (error) {
     console.error("Unable to start webcam:", error);
+    stopStream();
+    state.app?.ticker.stop();
     const hint = STARTUP_ERROR_MESSAGES[error.name] ||
       "We couldn't access your camera. Please check your browser settings.";
     showError(hint);
