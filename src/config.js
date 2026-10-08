@@ -33,9 +33,9 @@ export const ERROR_MESSAGES = {
 };
 
 export const STARTUP_ERROR_MESSAGES = {
-  NotAllowedError: "Please allow camera access and refresh the page.",
-  NotFoundError: "No camera found on your device.",
-  NotReadableError: "Camera is already in use by another application."
+  NotAllowedError: "Allow camera access in your browser's site settings, then try again.",
+  NotFoundError: "No camera was found on this device. Connect one and try again.",
+  NotReadableError: "The camera is in use by another app. Close it and try again."
 };
 
 // MeteringMode values from the MediaStream Image Capture spec.

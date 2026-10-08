@@ -10,9 +10,19 @@ import {
 import { CONFIG, ERROR_MESSAGES } from "./config.js";
 import { DOM } from "./dom.js";
 import { state } from "./state.js";
-import { nextAnimationFrame, setStatus, showError, waitForVideoFrame } from "./utils.js";
+import {
+  hideState, nextAnimationFrame, pauseRendering, resumeRendering, setStatus, showError, waitForVideoFrame
+} from "./utils.js";
 import { checkMultipleCameras, getCameraStream, stopStream } from "./camera.js";
 import { detectCameraCapabilities } from "./camera-controls.js";
+import { applyFrameRatio } from "./frame.js";
+
+// User-facing cameras (and desktop webcams, which report no facing mode)
+// are mirrored like a selfie preview; what you see is what gets saved.
+const isMirrored = () => {
+  const facing = state.currentStream?.getVideoTracks()[0]?.getSettings?.().facingMode;
+  return facing !== 'environment';
+};
 
 export const createResizeHandler = () => {
   return () => {
@@ -26,6 +36,8 @@ export const createResizeHandler = () => {
     const videoAspect = videoWidth / videoHeight;
     const viewAspect = width / height;
 
+    // Cover the frame: scale by whichever dimension is tighter and crop
+    // the rest, so the chosen ratio never shows letterboxing.
     if (viewAspect > videoAspect) {
       state.sprite.width = width * CONFIG.SCALE_FACTOR;
       state.sprite.height = state.sprite.width / videoAspect;
@@ -33,6 +45,8 @@ export const createResizeHandler = () => {
       state.sprite.height = height * CONFIG.SCALE_FACTOR;
       state.sprite.width = state.sprite.height * videoAspect;
     }
+
+    if (isMirrored()) state.sprite.scale.x = -Math.abs(state.sprite.scale.x);
   };
 };
 
@@ -52,16 +66,10 @@ export const createVideoSprite = () => {
   return { texture, sprite };
 };
 
-// The About modal pauses rendering while it covers the canvas (see
-// modal.js), so only restart the ticker when it isn't open.
-const resumeRendering = () => {
-  if (!DOM.aboutModal.classList.contains('active')) state.app.ticker.start();
-};
-
 const updateVideoTexture = async () => {
   try {
     DOM.webcam.pause();
-    state.app.ticker.stop();
+    pauseRendering('texture');
 
     await nextAnimationFrame();
 
@@ -95,18 +103,16 @@ const updateVideoTexture = async () => {
     state.sprite = sprite;
     state.app.stage.addChild(state.sprite);
 
-    if (state.resizeHandler) {
-      state.resizeHandler();
-    }
+    // The new camera may have a different orientation, which flips the
+    // effective frame ratio; this also runs the resize handler.
+    applyFrameRatio();
 
     state.app.renderer.render(state.app.stage);
-    resumeRendering();
   } catch (error) {
     console.error('Failed to update video texture:', error);
-    if (state.app?.ticker) {
-      resumeRendering();
-    }
     throw error;
+  } finally {
+    resumeRendering('texture');
   }
 };
 
@@ -122,12 +128,16 @@ export const attachStream = (stream) => {
   }, { once: true });
 };
 
+const setCameraButtonsEnabled = (enabled) => {
+  DOM.captureBtn.disabled = !enabled;
+  DOM.switchCameraBtn.disabled = !enabled;
+};
+
 // Opens a camera as the new feed (the given device, or by default any
 // camera, preferring the rear one), or enters the camera lost state if
 // none can be opened. Resolves to whether a camera is running again.
 export const reopenCamera = async (deviceId = null) => {
-  DOM.switchCameraBtn.disabled = true;
-  DOM.captureBtn.disabled = true;
+  setCameraButtonsEnabled(false);
   stopStream();
 
   try {
@@ -138,8 +148,9 @@ export const reopenCamera = async (deviceId = null) => {
     await updateVideoTexture();
     await checkMultipleCameras();
 
-    DOM.switchCameraBtn.disabled = false;
-    DOM.captureBtn.disabled = false;
+    hideState();
+    resumeRendering('camera');
+    setCameraButtonsEnabled(true);
     return true;
   } catch (error) {
     console.error('Failed to reopen camera:', error);
@@ -151,7 +162,7 @@ export const reopenCamera = async (deviceId = null) => {
 const handleCameraEnded = async () => {
   console.warn('Active camera ended, trying another one');
   if (await reopenCamera()) {
-    setStatus('⚠️ Camera disconnected, switched to another one', CONFIG.DELAYS.ERROR_MESSAGE);
+    setStatus('Camera disconnected, switched to another one', CONFIG.DELAYS.ERROR_MESSAGE, 'info');
   }
 };
 
@@ -166,9 +177,8 @@ export const switchCamera = async () => {
   const nextCamera = state.availableCameras[nextIndex];
 
   try {
-    DOM.switchCameraBtn.disabled = true;
-    DOM.captureBtn.disabled = true;
-    setStatus('🔄 Switching camera...');
+    setCameraButtonsEnabled(false);
+    setStatus('Switching camera…');
 
     state.currentCameraIndex = nextIndex;
 
@@ -180,18 +190,15 @@ export const switchCamera = async () => {
 
     await updateVideoTexture();
 
-    setStatus(`✅ ${nextCamera.label}`, CONFIG.DELAYS.STATUS_MESSAGE);
+    setStatus(nextCamera.label, CONFIG.DELAYS.STATUS_MESSAGE, 'success');
   } catch (error) {
     console.error("Camera switch failed:", error);
     const message = ERROR_MESSAGES[error.name] || "Camera switch failed";
-    setStatus(`❌ ${message}`, CONFIG.DELAYS.ERROR_MESSAGE);
+    setStatus(message, CONFIG.DELAYS.ERROR_MESSAGE, 'error');
     await recoverPreviousCamera(previousIndex);
   } finally {
     // Leave the buttons disabled if the camera could not be recovered.
-    if (state.currentStream) {
-      DOM.switchCameraBtn.disabled = false;
-      DOM.captureBtn.disabled = false;
-    }
+    if (state.currentStream) setCameraButtonsEnabled(true);
   }
 };
 
@@ -217,14 +224,19 @@ const recoverPreviousCamera = async (previousIndex) => {
   }
 };
 
-// Terminal state: no usable stream. Stop rendering into the (soon
-// detached) canvas and keep the camera-dependent buttons disabled so
-// e.g. capturing can't download a blank frame.
+// No usable stream. Stop rendering into the (soon detached) canvas and
+// keep the camera-dependent buttons disabled so e.g. capturing can't
+// download a blank frame. "Try again" reopens any available camera.
 export const showCameraLost = () => {
   stopStream();
   DOM.webcam.srcObject = null;
-  state.app?.ticker.stop();
-  DOM.captureBtn.disabled = true;
-  DOM.switchCameraBtn.disabled = true;
-  showError("Camera connection lost. Please refresh the page.");
+  pauseRendering('camera');
+  setCameraButtonsEnabled(false);
+  // No track, no capabilities: hides the zoom pill and settings button.
+  detectCameraCapabilities();
+  showError(
+    "Camera disconnected",
+    "The camera stopped sending video. Reconnect it, or try another camera.",
+    () => reopenCamera()
+  );
 };

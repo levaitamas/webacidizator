@@ -48,9 +48,9 @@ export const checkMultipleCameras = async () => {
       if (state.currentCameraIndex === -1) state.currentCameraIndex = 0;
     }
 
-    DOM.switchCameraBtn.style.display = state.availableCameras.length > 1 ? 'flex' : 'none';
+    DOM.switchCameraBtn.hidden = state.availableCameras.length < 2;
   } catch (error) {
     console.error("Failed to check cameras:", error);
-    DOM.switchCameraBtn.style.display = 'none';
+    DOM.switchCameraBtn.hidden = true;
   }
 };

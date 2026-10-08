@@ -11,5 +11,8 @@ export const state = {
   texture: null,
   glitchFilter: null,
   resizeHandler: null,
-  cameraCapabilities: null
+  cameraCapabilities: null,
+  // Last captured photo, kept for the review screen and the thumbnail.
+  lastPhotoBlob: null,
+  lastPhotoUrl: null
 };

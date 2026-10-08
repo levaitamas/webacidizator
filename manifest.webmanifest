@@ -1,0 +1,13 @@
+{
+  "name": "WebAcidizator",
+  "short_name": "Acidizator",
+  "description": "A web recreation of the Acidizator, a faulty camera that distorts colors and forms.",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0a0b",
+  "theme_color": "#0a0a0b",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

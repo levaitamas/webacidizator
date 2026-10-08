@@ -126,9 +126,12 @@ try {
   const startup = await page
     .waitForFunction(
       () => {
-        if (document.querySelector("#app canvas")) return "canvas";
-        const error = document.querySelector("#app .error");
-        return error ? error.textContent.trim() : null;
+        const state = document.querySelector("#viewfinderState");
+        if (state?.dataset.state === "error" && !state.hidden) {
+          return state.textContent.replace(/\s+/g, " ").trim();
+        }
+        if (document.querySelector("#app canvas") && state?.hidden) return "canvas";
+        return null;
       },
       null,
       { timeout: 45000, polling: 250 },
@@ -193,9 +196,89 @@ try {
     const screenshot = join(resultsDir, "smoke.png");
     await page.screenshot({ path: screenshot });
     console.log(`[smoke] screenshot saved to ${screenshot}`);
+
+    // 5. Capture: the shutter opens the review screen with the frame as an image.
+    await page.click("#captureBtn");
+    const review = await page
+      .waitForFunction(
+        () => {
+          const img = document.querySelector("#reviewImage");
+          const open = !document.querySelector("#review").hidden;
+          return open && img.complete && img.naturalWidth > 0
+            ? { width: img.naturalWidth, height: img.naturalHeight }
+            : null;
+        },
+        null,
+        { timeout: 15000, polling: 250 },
+      )
+      .then((handle) => handle.jsonValue())
+      .catch(() => null);
+    if (review) {
+      ok(`capture opened the review screen (${review.width}x${review.height} image)`);
+      await page.screenshot({ path: join(resultsDir, "review.png") });
+    } else {
+      fail("capture did not open the review screen with an image");
+    }
+    await page.keyboard.press("Escape");
+    const thumbVisible = await page.evaluate(
+      () => !document.querySelector("#lastPhotoBtn").hidden,
+    );
+    if (thumbVisible) {
+      ok("last-photo thumbnail shown after capture");
+    } else {
+      fail("last-photo thumbnail not shown after capture");
+    }
   }
 
-  // 5. No uncaught exceptions, console errors, or failed network requests.
+  // 6. Layout: no viewport may scroll the page, and the shutter must stay
+  //    on screen with the frame filling the viewfinder.
+  const layouts = [
+    { name: "phone portrait", viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true },
+    { name: "phone landscape", viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true },
+    { name: "small phone", viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true },
+    { name: "desktop", viewport: { width: 1440, height: 900 } },
+    { name: "short desktop", viewport: { width: 1280, height: 600 } },
+  ];
+  for (const layout of layouts) {
+    const layoutContext = await browser.newContext({ ...layout, permissions: ["camera"] });
+    const layoutPage = await layoutContext.newPage();
+    try {
+      await layoutPage.goto(base, { waitUntil: "load", timeout: 30000 });
+      await layoutPage
+        .waitForFunction(() => !document.querySelector("#captureBtn")?.disabled, null, {
+          timeout: 45000,
+          polling: 250,
+        })
+        .catch(() => {});
+      const metrics = await layoutPage.evaluate(() => {
+        const doc = document.documentElement;
+        const shutter = document.querySelector("#captureBtn").getBoundingClientRect();
+        const frame = document.querySelector("#app").getBoundingClientRect();
+        const view = document.querySelector("#viewfinder").getBoundingClientRect();
+        return {
+          scrolls: doc.scrollHeight > innerHeight + 1 || doc.scrollWidth > innerWidth + 1,
+          shutterOnScreen:
+            shutter.width > 0 && shutter.top >= 0 && shutter.left >= 0 &&
+            shutter.bottom <= innerHeight && shutter.right <= innerWidth,
+          frameFills: Math.abs(frame.width - view.width) < 2 || Math.abs(frame.height - view.height) < 2,
+          frame: `${Math.round(frame.width)}x${Math.round(frame.height)}`,
+        };
+      });
+      const problems = [];
+      if (metrics.scrolls) problems.push("page scrolls");
+      if (!metrics.shutterOnScreen) problems.push("shutter off screen");
+      if (!metrics.frameFills) problems.push("frame does not fill the viewfinder");
+      if (problems.length === 0) {
+        ok(`${layout.name} (${layout.viewport.width}x${layout.viewport.height}): frame ${metrics.frame}, no scroll, shutter visible`);
+      } else {
+        fail(`${layout.name} (${layout.viewport.width}x${layout.viewport.height}): ${problems.join(", ")}`);
+      }
+    } finally {
+      await layoutContext.close();
+    }
+  }
+
+  // 7. No uncaught exceptions, console errors, or failed network requests.
   if (pageErrors.length === 0) {
     ok("no uncaught page errors");
   } else {

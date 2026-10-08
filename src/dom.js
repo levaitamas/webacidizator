@@ -2,30 +2,61 @@
 // DOM Elements
 // ============================================================================
 
+const byId = (id) => document.getElementById(id);
+
 export const DOM = {
-  container: document.getElementById("app"),
-  webcam: document.getElementById("webcam"),
-  captureBtn: document.getElementById("captureBtn"),
-  switchCameraBtn: document.getElementById("switchCameraBtn"),
-  aboutBtn: document.getElementById("aboutBtn"),
-  flash: document.getElementById("flash"),
-  status: document.getElementById("status"),
-  aboutModal: document.getElementById("aboutModal"),
-  closeModal: document.getElementById("closeModal"),
-  cameraControls: document.getElementById("cameraControls"),
-  zoomGroup: document.getElementById("zoomGroup"),
-  zoomSlider: document.getElementById("zoomSlider"),
-  zoomValue: document.getElementById("zoomValue"),
-  torchGroup: document.getElementById("torchGroup"),
-  torchBtn: document.getElementById("torchBtn"),
-  focusGroup: document.getElementById("focusGroup"),
-  focusBtn: document.getElementById("focusBtn"),
-  focusDistanceGroup: document.getElementById("focusDistanceGroup"),
-  focusDistanceSlider: document.getElementById("focusDistanceSlider"),
-  focusDistanceValue: document.getElementById("focusDistanceValue"),
-  exposureGroup: document.getElementById("exposureGroup"),
-  exposureBtn: document.getElementById("exposureBtn"),
-  exposureCompGroup: document.getElementById("exposureCompGroup"),
-  exposureCompSlider: document.getElementById("exposureCompSlider"),
-  exposureCompValue: document.getElementById("exposureCompValue")
+  container: byId("app"),
+  viewfinder: byId("viewfinder"),
+  webcam: byId("webcam"),
+  flash: byId("flash"),
+  status: byId("status"),
+
+  // Top bar
+  aboutBtn: byId("aboutBtn"),
+  ratioBtn: byId("ratioBtn"),
+  ratioMenu: byId("ratioMenu"),
+  settingsBtn: byId("settingsBtn"),
+
+  // Control bar
+  captureBtn: byId("captureBtn"),
+  switchCameraBtn: byId("switchCameraBtn"),
+  lastPhotoBtn: byId("lastPhotoBtn"),
+  lastPhotoImg: byId("lastPhotoImg"),
+
+  // Startup / error state
+  viewfinderState: byId("viewfinderState"),
+  stateTitle: byId("stateTitle"),
+  stateText: byId("stateText"),
+  retryBtn: byId("retryBtn"),
+
+  // Photo review
+  review: byId("review"),
+  reviewClose: byId("reviewClose"),
+  reviewImage: byId("reviewImage"),
+  shareBtn: byId("shareBtn"),
+  saveBtn: byId("saveBtn"),
+
+  // About modal
+  aboutModal: byId("aboutModal"),
+  closeModal: byId("closeModal"),
+
+  // Camera settings sheet
+  settingsScrim: byId("settingsScrim"),
+  settingsPanel: byId("settingsPanel"),
+  settingsClose: byId("settingsClose"),
+  zoomGroup: byId("zoomGroup"),
+  zoomSlider: byId("zoomSlider"),
+  zoomValue: byId("zoomValue"),
+  torchGroup: byId("torchGroup"),
+  torchBtn: byId("torchBtn"),
+  focusGroup: byId("focusGroup"),
+  focusModes: byId("focusModes"),
+  focusDistanceGroup: byId("focusDistanceGroup"),
+  focusDistanceSlider: byId("focusDistanceSlider"),
+  focusDistanceValue: byId("focusDistanceValue"),
+  exposureGroup: byId("exposureGroup"),
+  exposureModes: byId("exposureModes"),
+  exposureCompGroup: byId("exposureCompGroup"),
+  exposureCompSlider: byId("exposureCompSlider"),
+  exposureCompValue: byId("exposureCompValue")
 };
